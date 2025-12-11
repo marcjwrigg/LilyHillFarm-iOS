@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>fetch</string>
+	</array>
+	<key>CFBundleIdentifier</key>
+	<string></string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>LilyHillFarm needs access to your photo library to attach photos to your cattle records</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>LilyHillFarm needs permission to save photos to your library</string>
+	<key>NSCameraUsageDescription</key>
+	<string>LilyHillFarm needs access to your camera to take photos of your cattle</string>
+	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
+	<true/>
+</dict>
+</plist>
