@@ -65,6 +65,9 @@
         <!-- NEW: Soft delete support -->
         <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
 
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+
         <!-- Metadata -->
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
@@ -124,6 +127,8 @@
         <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <!-- NEW: Soft delete support -->
         <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
         <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="healthRecords" inverseEntity="Cattle"/>
         <relationship name="treatmentPlan" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="TreatmentPlan" inverseName="healthRecords" inverseEntity="TreatmentPlan"/>
         <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="healthRecord" inverseEntity="Photo"/>
@@ -149,6 +154,8 @@
         <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <!-- NEW: Soft delete support -->
         <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
         <relationship name="dam" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="calvingRecordsAsDam" inverseEntity="Cattle"/>
         <relationship name="sire" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="calvingRecordsAsSire" inverseEntity="Cattle"/>
         <relationship name="calf" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="calvingRecordAsCalf" inverseEntity="Cattle"/>
@@ -180,6 +187,8 @@
         <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <!-- NEW: Soft delete support -->
         <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
         <relationship name="cow" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="pregnancyRecordsAsCow" inverseEntity="Cattle"/>
         <relationship name="bull" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="pregnancyRecordsAsBull" inverseEntity="Cattle"/>
         <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="pregnancyRecord" inverseEntity="Photo"/>
@@ -198,6 +207,8 @@
         <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <!-- NEW: Soft delete support -->
         <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
         <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="stageTransitions" inverseEntity="Cattle"/>
     </entity>
 
@@ -216,6 +227,8 @@
         <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <!-- NEW: Soft delete support -->
         <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
         <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="processingRecord" inverseEntity="Cattle"/>
         <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="processingRecord" inverseEntity="Photo"/>
     </entity>
@@ -233,6 +246,8 @@
         <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <!-- NEW: Soft delete support -->
         <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
         <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="saleRecord" inverseEntity="Cattle"/>
         <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="saleRecord" inverseEntity="Photo"/>
     </entity>
@@ -254,6 +269,8 @@
         <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <!-- NEW: Soft delete support -->
         <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
         <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="mortalityRecord" inverseEntity="Cattle"/>
         <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="mortalityRecord" inverseEntity="Photo"/>
     </entity>
@@ -272,6 +289,8 @@
         <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <!-- NEW: Soft delete support -->
         <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
         <!-- Polymorphic relationships - only one should be set -->
         <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="photos" inverseEntity="Cattle"/>
         <relationship name="healthRecord" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="HealthRecord" inverseName="photos" inverseEntity="HealthRecord"/>
@@ -335,6 +354,8 @@
         <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <!-- NEW: Soft delete support -->
         <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
         <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="tasks" inverseEntity="Cattle"/>
         <relationship name="healthRecord" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="HealthRecord" inverseName="tasks" inverseEntity="HealthRecord"/>
     </entity>
@@ -377,6 +398,8 @@
         <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <!-- Soft delete support -->
         <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
 
         <!-- Relationships -->
         <relationship name="phoneNumbers" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ContactPhoneNumber" inverseName="contact" inverseEntity="ContactPhoneNumber"/>

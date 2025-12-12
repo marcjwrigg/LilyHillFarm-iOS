@@ -12,6 +12,8 @@ struct BreedingDashboardView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @State private var selectedDaysFilter: Int? = 30
     @State private var showAllPregnancies = false
+    @State private var isActivePregnanciesExpanded = true
+    @State private var isRecentCalvingsExpanded = true
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Cattle.tagNumber, ascending: true)],
@@ -139,6 +141,74 @@ struct BreedingDashboardView: View {
         }
     }
 
+    // MARK: - Breeding Performance Stats
+
+    var avgDaysPostPartum: Int? {
+        var intervals: [Int] = []
+
+        for cattle in breedableCattle {
+            let calvings = cattle.sortedCalvingRecords
+            let pregnancies = cattle.sortedPregnancyRecords.sorted {
+                ($0.breedingDate ?? Date.distantPast) < ($1.breedingDate ?? Date.distantPast)
+            }
+
+            for calving in calvings {
+                guard let calvingDate = calving.calvingDate else { continue }
+
+                // Find first pregnancy where breeding date is after this calving date
+                if let nextBreeding = pregnancies.first(where: { pregnancy in
+                    guard let breedingDate = pregnancy.breedingDate else { return false }
+                    return breedingDate > calvingDate
+                }) {
+                    let days = Calendar.current.dateComponents([.day], from: calvingDate, to: nextBreeding.breedingDate!).day ?? 0
+                    if days > 0 && days < 365 { // Sanity check
+                        intervals.append(days)
+                    }
+                }
+            }
+        }
+
+        guard !intervals.isEmpty else { return nil }
+        return intervals.reduce(0, +) / intervals.count
+    }
+
+    var avgDaysBetweenCalving: Int? {
+        var intervals: [Int] = []
+
+        for cattle in breedableCattle {
+            let calvings = cattle.sortedCalvingRecords.reversed() // Oldest first
+                .compactMap { $0.calvingDate }
+
+            for i in 1..<calvings.count {
+                let days = Calendar.current.dateComponents([.day], from: calvings[i-1], to: calvings[i]).day ?? 0
+                if days > 0 {
+                    intervals.append(days)
+                }
+            }
+        }
+
+        guard !intervals.isEmpty else { return nil }
+        return intervals.reduce(0, +) / intervals.count
+    }
+
+    var bullHeiferRatio: String {
+        let allOffspring = activeCattle.flatMap { cattle in
+            cattle.offspringArray + cattle.offspringAsSire
+        }
+
+        let bulls = allOffspring.filter { $0.sex == CattleSex.bull.rawValue || $0.sex == CattleSex.steer.rawValue }.count
+        let heifers = allOffspring.filter { $0.sex == CattleSex.heifer.rawValue || $0.sex == CattleSex.cow.rawValue }.count
+
+        if heifers > 0 {
+            let ratio = Double(bulls) / Double(heifers)
+            return "\(bulls):\(heifers) (\(String(format: "%.2f", ratio)):1)"
+        } else if bulls > 0 {
+            return "\(bulls):0"
+        } else {
+            return "—"
+        }
+    }
+
     var body: some View {
         ScrollView {
                 VStack(spacing: 20) {
@@ -178,6 +248,34 @@ struct BreedingDashboardView: View {
                     }
                     .padding(.horizontal)
 
+                    // Breeding Performance Metrics
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                        StatCard(
+                            title: "Avg Days Post Partum",
+                            value: avgDaysPostPartum.map { "\($0)" } ?? "—",
+                            icon: "calendar",
+                            color: .blue,
+                            subtitle: "Days until rebred after calving"
+                        )
+
+                        StatCard(
+                            title: "Avg Days Between Calving",
+                            value: avgDaysBetweenCalving.map { "\($0)" } ?? "—",
+                            icon: "calendar.badge.clock",
+                            color: .purple,
+                            subtitle: "Calving interval"
+                        )
+
+                        StatCard(
+                            title: "Bull:Heifer Ratio",
+                            value: bullHeiferRatio,
+                            icon: "chart.bar",
+                            color: .indigo,
+                            subtitle: "All-time offspring ratio"
+                        )
+                    }
+                    .padding(.horizontal)
+
                     // Two Column Layout
                     #if os(iOS)
                     VStack(spacing: 16) {
@@ -211,7 +309,7 @@ struct BreedingDashboardView: View {
     // MARK: - Active Pregnancies Card
 
     private var activePregnanciesCard: some View {
-        InfoCard(title: "Active Pregnancies", subtitle: "Sorted by closest to furthest calving date") {
+        InfoCard(title: "Active Pregnancies", subtitle: "Sorted by closest to furthest calving date", isExpanded: $isActivePregnanciesExpanded) {
             // Filter chips
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -428,7 +526,7 @@ struct BreedingDashboardView: View {
     // MARK: - Recent Calvings Card
 
     private var recentCalvingsCard: some View {
-        InfoCard(title: "Recent Calvings", subtitle: "Latest calving records") {
+        InfoCard(title: "Recent Calvings", subtitle: "Latest calving records", isExpanded: $isRecentCalvingsExpanded) {
             if allCalvingRecords.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "figure.and.child.holdinghands")

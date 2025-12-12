@@ -7,7 +7,6 @@
 
 import SwiftUI
 internal import CoreData
-internal import CoreData
 
 struct CattleDetailView: View {
     @ObservedObject var cattle: Cattle
@@ -24,6 +23,18 @@ struct CattleDetailView: View {
     @State private var showingPhotoLibrary = false
     @State private var showingHeroImage = false
     @State private var showingAddHealthRecord = false
+    @State private var showingFamilyTree = false
+
+    // Section expansion states
+    @State private var isBasicInfoExpanded = true
+    @State private var isBreedingExpanded = true
+    @State private var isHealthExpanded = true
+    @State private var isLifecycleExpanded = true
+    @State private var isLineageExpanded = true
+    @State private var isNotesExpanded = true
+    @State private var isPhotosExpanded = true
+    @State private var isStageHistoryExpanded = false
+    @State private var isExitActionsExpanded = false
 
     var body: some View {
         ScrollView {
@@ -32,7 +43,7 @@ struct CattleDetailView: View {
                 headerSection
 
                 // Basic Information Card
-                InfoCard(title: "Basic Information") {
+                InfoCard(title: "Basic Information", isExpanded: $isBasicInfoExpanded) {
                     InfoRow(label: "Tag Number", value: cattle.tagNumber ?? "N/A")
                     InfoRow(label: "Name", value: cattle.name ?? "Not set")
                     InfoRow(label: "Sex", value: cattle.sex ?? "N/A")
@@ -42,11 +53,16 @@ struct CattleDetailView: View {
                     if let markings = cattle.markings, !markings.isEmpty {
                         InfoRow(label: "Markings", value: markings)
                     }
+                    if let weight = cattle.currentWeight as? Decimal, weight > 0 {
+                        InfoRow(label: "Current Weight", value: "\(weight as NSNumber) lbs")
+                    } else {
+                        InfoRow(label: "Current Weight", value: "Not recorded")
+                    }
                 }
 
                 // Breeding & Calving Card (for cows/heifers only)
                 if cattle.sex == CattleSex.cow.rawValue || cattle.sex == CattleSex.heifer.rawValue {
-                    InfoCard(title: "Breeding & Calving") {
+                    InfoCard(title: "Breeding & Calving", isExpanded: $isBreedingExpanded) {
                         // Pending breeding
                         if let pendingBreeding = cattle.pendingBreeding {
                             VStack(alignment: .leading, spacing: 10) {
@@ -215,42 +231,80 @@ struct CattleDetailView: View {
                                     }
                                 }
 
-                                // Breeding method and AI protocol
+                                // Breeding date
                                 HStack(spacing: 4) {
-                                    if let method = currentPregnancy.breedingMethod {
-                                        Text("Method:")
+                                    Image(systemName: "calendar")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("Bred:")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text(currentPregnancy.displayBreedingDate)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                }
+
+                                // Breeding method
+                                HStack(spacing: 4) {
+                                    Image(systemName: "heart.text.square")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("Method:")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text(currentPregnancy.displayMethod)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                }
+
+                                // Sire information
+                                if let sire = currentPregnancy.bull {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "pawprint")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
-                                        Text(method)
+                                        Text("Sire:")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text(sire.displayName)
                                             .font(.caption)
                                             .fontWeight(.medium)
-                                            .foregroundColor(.primary)
+                                        if let breed = sire.breed?.name {
+                                            Text("(\(breed))")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
-
-                                    if let aiTech = currentPregnancy.aiTechnician, !aiTech.isEmpty {
-                                        Text("•")
+                                } else if let externalBull = currentPregnancy.externalBullName, !externalBull.isEmpty {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "pawprint")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
-                                        Text("AI Tech: \(aiTech)")
+                                        Text("Sire:")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text(externalBull)
+                                            .font(.caption)
+                                            .fontWeight(.medium)
+                                        Text("(AI Bull)")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                     }
                                 }
 
-                                HStack(spacing: 12) {
-                                    if let sire = currentPregnancy.bull {
-                                        Text("Sire: \(sire.displayName)")
+                                // AI Technician if available
+                                if let aiTech = currentPregnancy.aiTechnician, !aiTech.isEmpty {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "person")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
-                                    } else if let externalBull = currentPregnancy.externalBullName, !externalBull.isEmpty {
-                                        Text("Sire: \(externalBull)")
+                                        Text("AI Tech:")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
+                                        Text(aiTech)
+                                            .font(.caption)
+                                            .fontWeight(.medium)
                                     }
-
-                                    Text("Bred: \(currentPregnancy.displayBreedingDate)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
                                 }
                             }
                             .padding()
@@ -276,6 +330,98 @@ struct CattleDetailView: View {
                             Spacer()
                             Text("\(previousPregnancies.count)")
                                 .fontWeight(.semibold)
+                        }
+
+                        // Breeding Statistics
+                        if cattle.sortedCalvingRecords.count > 0 {
+                            Divider()
+
+                            // Bull:Heifer Ratio
+                            let bulls = cattle.offspringArray.filter { $0.sex == CattleSex.bull.rawValue || $0.sex == CattleSex.steer.rawValue }.count
+                            let heifers = cattle.offspringArray.filter { $0.sex == CattleSex.heifer.rawValue || $0.sex == CattleSex.cow.rawValue }.count
+                            let ratioText: String = {
+                                if heifers > 0 {
+                                    let ratio = Double(bulls) / Double(heifers)
+                                    return "\(bulls):\(heifers) (\(String(format: "%.2f", ratio)):1)"
+                                } else if bulls > 0 {
+                                    return "\(bulls):0"
+                                } else {
+                                    return "—"
+                                }
+                            }()
+
+                            HStack {
+                                Text("Bull:Heifer Ratio")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text(ratioText)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.indigo)
+                            }
+
+                            // Avg Days Post Partum
+                            let avgDaysPostPartum: Int? = {
+                                var intervals: [Int] = []
+                                let calvings = cattle.sortedCalvingRecords
+                                let pregnancies = cattle.sortedPregnancyRecords.sorted {
+                                    ($0.breedingDate ?? Date.distantPast) < ($1.breedingDate ?? Date.distantPast)
+                                }
+
+                                for calving in calvings {
+                                    guard let calvingDate = calving.calvingDate else { continue }
+
+                                    if let nextBreeding = pregnancies.first(where: { pregnancy in
+                                        guard let breedingDate = pregnancy.breedingDate else { return false }
+                                        return breedingDate > calvingDate
+                                    }) {
+                                        let days = Calendar.current.dateComponents([.day], from: calvingDate, to: nextBreeding.breedingDate!).day ?? 0
+                                        if days > 0 && days < 365 {
+                                            intervals.append(days)
+                                        }
+                                    }
+                                }
+
+                                return intervals.isEmpty ? nil : intervals.reduce(0, +) / intervals.count
+                            }()
+
+                            if let avgDays = avgDaysPostPartum {
+                                HStack {
+                                    Text("Avg Days Post Partum")
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Text("\(avgDays)")
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.blue)
+                                }
+                            }
+
+                            // Avg Days Between Calving
+                            let avgDaysBetweenCalving: Int? = {
+                                let calvingDates = cattle.sortedCalvingRecords.reversed()
+                                    .compactMap { $0.calvingDate }
+                                guard calvingDates.count > 1 else { return nil }
+
+                                var intervals: [Int] = []
+                                for i in 1..<calvingDates.count {
+                                    let days = Calendar.current.dateComponents([.day], from: calvingDates[i-1], to: calvingDates[i]).day ?? 0
+                                    if days > 0 {
+                                        intervals.append(days)
+                                    }
+                                }
+
+                                return intervals.isEmpty ? nil : intervals.reduce(0, +) / intervals.count
+                            }()
+
+                            if let avgDays = avgDaysBetweenCalving {
+                                HStack {
+                                    Text("Avg Days Between Calving")
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Text("\(avgDays)")
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.purple)
+                                }
+                            }
                         }
 
                         // Latest calving
@@ -327,7 +473,7 @@ struct CattleDetailView: View {
                 }
 
                 // Health Summary Card
-                InfoCard(title: "Health") {
+                InfoCard(title: "Health", isExpanded: $isHealthExpanded) {
                     HStack {
                         Text("Total Records")
                             .foregroundColor(.secondary)
@@ -425,7 +571,7 @@ struct CattleDetailView: View {
                 }
 
                 // Lifecycle Card
-                InfoCard(title: "Lifecycle") {
+                InfoCard(title: "Lifecycle", isExpanded: $isLifecycleExpanded) {
                     HStack {
                         Text("Current Stage")
                             .foregroundColor(.secondary)
@@ -463,23 +609,6 @@ struct CattleDetailView: View {
                         }
                         .buttonStyle(.plain)
                         .padding(.top, 8)
-                    }
-                }
-
-                // Physical Attributes Card
-                InfoCard(title: "Physical Attributes") {
-                    if let weight = cattle.currentWeight as? Decimal, weight > 0 {
-                        InfoRow(label: "Current Weight", value: "\(weight as NSNumber) lbs")
-                    } else {
-                        InfoRow(label: "Current Weight", value: "Not recorded")
-                    }
-
-                    if let daysOnFeed = cattle.daysOnFeed {
-                        InfoRow(label: "Days on Feed", value: "\(daysOnFeed)")
-                    }
-
-                    if let adg = cattle.averageDailyGain {
-                        InfoRow(label: "Avg Daily Gain", value: "\(adg as NSNumber) lbs/day")
                     }
                 }
 
@@ -538,50 +667,25 @@ struct CattleDetailView: View {
                     }
                 }
 
-                // Pedigree Card
-                if cattle.dam != nil || cattle.sire != nil || !cattle.offspringArray.isEmpty {
-                    InfoCard(title: "Pedigree") {
-                        if let dam = cattle.dam {
-                            NavigationLink(destination: CattleDetailView(cattle: dam)) {
-                                HStack {
-                                    Text("Dam")
-                                        .foregroundColor(.secondary)
-                                    Spacer()
-                                    Text(dam.displayName)
-                                        .foregroundColor(.primary)
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        }
-
-                        if let sire = cattle.sire {
-                            NavigationLink(destination: CattleDetailView(cattle: sire)) {
-                                HStack {
-                                    Text("Sire")
-                                        .foregroundColor(.secondary)
-                                    Spacer()
-                                    Text(sire.displayName)
-                                        .foregroundColor(.primary)
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        }
-
-                        if !cattle.offspringArray.isEmpty {
+                // Lineage & Offspring Card
+                if cattle.dam != nil || cattle.sire != nil || !cattle.offspringAsSire.isEmpty || !cattle.offspringArray.isEmpty {
+                    InfoCard(title: "Lineage & Offspring", isExpanded: $isLineageExpanded) {
+                        // Parents section
+                        if cattle.dam != nil || cattle.sire != nil {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Offspring (\(cattle.offspringArray.count))")
+                                Text("Parents")
                                     .font(.subheadline)
+                                    .fontWeight(.semibold)
                                     .foregroundColor(.secondary)
 
-                                ForEach(cattle.offspringArray.prefix(3), id: \.objectID) { calf in
-                                    NavigationLink(destination: CattleDetailView(cattle: calf)) {
+                                if let dam = cattle.dam {
+                                    NavigationLink(destination: CattleDetailView(cattle: dam)) {
                                         HStack {
-                                            Text(calf.displayName)
+                                            Text("Dam")
+                                                .foregroundColor(.secondary)
                                             Spacer()
+                                            Text(dam.displayName)
+                                                .foregroundColor(.primary)
                                             Image(systemName: "chevron.right")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
@@ -589,44 +693,114 @@ struct CattleDetailView: View {
                                     }
                                 }
 
-                                if cattle.offspringArray.count > 3 {
-                                    Text("+ \(cattle.offspringArray.count - 3) more")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                if let sire = cattle.sire {
+                                    NavigationLink(destination: CattleDetailView(cattle: sire)) {
+                                        HStack {
+                                            Text("Sire")
+                                                .foregroundColor(.secondary)
+                                            Spacer()
+                                            Text(sire.displayName)
+                                                .foregroundColor(.primary)
+                                            Image(systemName: "chevron.right")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                }
 
-                // Offspring Card (for bulls/cows that have sired/birthed calves)
-                if !cattle.offspringAsSire.isEmpty || !cattle.offspringArray.isEmpty {
-                    InfoCard(title: "Offspring") {
-                        if !cattle.offspringAsSire.isEmpty {
-                            HStack {
-                                Text("As Sire")
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Text("\(cattle.offspringAsSire.count)")
+                        // Offspring section
+                        if !cattle.offspringAsSire.isEmpty || !cattle.offspringArray.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                let totalOffspring = cattle.offspringAsSire.count + cattle.offspringArray.count
+                                Text("Offspring (\(totalOffspring))")
+                                    .font(.subheadline)
                                     .fontWeight(.semibold)
+                                    .foregroundColor(.secondary)
+                                    .padding(.top, cattle.dam != nil || cattle.sire != nil ? 12 : 0)
+
+                                // Show offspring as Dam
+                                if !cattle.offspringArray.isEmpty {
+                                    Text("As Dam (\(cattle.offspringArray.count))")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+
+                                    ForEach(cattle.offspringArray.prefix(3), id: \.objectID) { calf in
+                                        NavigationLink(destination: CattleDetailView(cattle: calf)) {
+                                            HStack {
+                                                Text(calf.displayName)
+                                                Spacer()
+                                                Image(systemName: "chevron.right")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                    }
+
+                                    if cattle.offspringArray.count > 3 {
+                                        Text("+ \(cattle.offspringArray.count - 3) more")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .padding(.leading, 4)
+                                    }
+                                }
+
+                                // Show offspring as Sire
+                                if !cattle.offspringAsSire.isEmpty {
+                                    Text("As Sire (\(cattle.offspringAsSire.count))")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .padding(.top, !cattle.offspringArray.isEmpty ? 8 : 0)
+
+                                    ForEach(cattle.offspringAsSire.prefix(3), id: \.objectID) { calf in
+                                        NavigationLink(destination: CattleDetailView(cattle: calf)) {
+                                            HStack {
+                                                Text(calf.displayName)
+                                                Spacer()
+                                                Image(systemName: "chevron.right")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                    }
+
+                                    if cattle.offspringAsSire.count > 3 {
+                                        Text("+ \(cattle.offspringAsSire.count - 3) more")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .padding(.leading, 4)
+                                    }
+                                }
+
+                                // View all offspring button
+                                if totalOffspring > 0 {
+                                    NavigationLink(destination: OffspringListView(cattle: cattle)) {
+                                        HStack {
+                                            Image(systemName: "heart")
+                                            Text("View All Offspring")
+                                                .fontWeight(.medium)
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .padding(.vertical, 8)
+                                        .padding(.horizontal, 12)
+                                        .background(Color(red: 0.95, green: 0.95, blue: 0.95))
+                                        .cornerRadius(8)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.top, 4)
+                                }
                             }
                         }
 
-                        if !cattle.offspringArray.isEmpty {
+                        // View Family Tree button
+                        Button(action: { showingFamilyTree = true }) {
                             HStack {
-                                Text("As Dam")
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Text("\(cattle.offspringArray.count)")
-                                    .fontWeight(.semibold)
-                            }
-                        }
-
-                        // View offspring button
-                        NavigationLink(destination: OffspringListView(cattle: cattle)) {
-                            HStack {
-                                Image(systemName: "heart")
-                                Text("View Offspring")
+                                Image(systemName: "circle.hexagonpath")
+                                Text("View Family Tree")
                                     .fontWeight(.medium)
                                 Spacer()
                                 Image(systemName: "chevron.right")
@@ -644,7 +818,7 @@ struct CattleDetailView: View {
                 }
 
                 // Notes Card
-                InfoCard(title: "Notes") {
+                InfoCard(title: "Notes", isExpanded: $isNotesExpanded) {
                     if let notes = cattle.notes, !notes.isEmpty {
                         Text(notes)
                             .font(.body)
@@ -674,19 +848,50 @@ struct CattleDetailView: View {
                 }
 
                 // Photos Card
-                InfoCard(title: "Photos") {
-                    HStack {
-                        Text("Total Photos")
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text("\(cattle.sortedPhotos.count)")
-                            .fontWeight(.semibold)
-                    }
+                InfoCard(title: "Photos", isExpanded: $isPhotosExpanded) {
+                    if cattle.sortedPhotos.isEmpty {
+                        // Empty state with add button
+                        VStack(spacing: 16) {
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.system(size: 48))
+                                .foregroundColor(.secondary)
 
-                    // Photo preview grid (first 6)
-                    if !cattle.sortedPhotos.isEmpty {
+                            Text("No Photos")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+
+                            Text("Add photos to visually identify this animal")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+
+                            Button(action: { showingPhotoSourcePicker = true }) {
+                                HStack {
+                                    Image(systemName: "plus.circle")
+                                    Text("Add Photos")
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                    } else {
+                        HStack {
+                            Text("Total Photos")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("\(cattle.sortedPhotos.count)")
+                                .fontWeight(.semibold)
+                        }
+
                         Divider()
 
+                        // Photo preview grid (first 6)
                         LazyVGrid(columns: [
                             GridItem(.flexible()),
                             GridItem(.flexible()),
@@ -728,42 +933,42 @@ struct CattleDetailView: View {
                                 .foregroundColor(.secondary)
                                 .padding(.top, 4)
                         }
-                    }
 
-                    // Action buttons
-                    HStack(spacing: 12) {
-                        Button(action: { showingPhotoSourcePicker = true }) {
-                            HStack {
-                                Image(systemName: "plus.circle")
-                                Text("Add")
+                        // Action buttons
+                        HStack(spacing: 12) {
+                            Button(action: { showingPhotoSourcePicker = true }) {
+                                HStack {
+                                    Image(systemName: "plus.circle")
+                                    Text("Add")
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
+                            .buttonStyle(.plain)
 
-                        Button(action: { showingPhotoGallery = true }) {
-                            HStack {
-                                Image(systemName: "photo.on.rectangle")
-                                Text("View All")
+                            Button(action: { showingPhotoGallery = true }) {
+                                HStack {
+                                    Image(systemName: "photo.on.rectangle")
+                                    Text("View All")
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color(red: 0.95, green: 0.95, blue: 0.95))
+                                .foregroundColor(.primary)
+                                .cornerRadius(8)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(Color(red: 0.95, green: 0.95, blue: 0.95))
-                            .foregroundColor(.primary)
-                            .cornerRadius(8)
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
+                        .padding(.top, 8)
                     }
-                    .padding(.top, 8)
                 }
 
                 // Stage History
                 if !cattle.sortedStageTransitions.isEmpty {
-                    InfoCard(title: "Stage History") {
+                    InfoCard(title: "Stage History", isExpanded: $isStageHistoryExpanded) {
                         ForEach(cattle.sortedStageTransitions, id: \.objectID) { transition in
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -796,7 +1001,7 @@ struct CattleDetailView: View {
 
                 // Exit Actions (only for active animals)
                 if cattle.currentStatus == CattleStatus.active.rawValue {
-                    InfoCard(title: "Exit Actions") {
+                    InfoCard(title: "Exit Actions", isExpanded: $isExitActionsExpanded) {
                         VStack(spacing: 12) {
                             Button(action: { showingSaleSheet = true }) {
                                 HStack {
@@ -852,7 +1057,7 @@ struct CattleDetailView: View {
         }
         .sheet(isPresented: $showingPromoteSheet) {
             if let nextStage = cattle.nextStage() {
-                if nextStage == .processed {
+                if nextStage == LegacyCattleStage.processed {
                     RecordProcessingView(cattle: cattle)
                 } else {
                     PromoteStageView(cattle: cattle, toStage: nextStage)
@@ -933,6 +1138,9 @@ struct CattleDetailView: View {
                     // The sheet will dismiss automatically, and we'll stay on this view
                 }
             }
+        }
+        .sheet(isPresented: $showingFamilyTree) {
+            FamilyTreeView(cattle: cattle)
         }
     }
 
@@ -1078,63 +1286,8 @@ struct CattleDetailView: View {
     }
 }
 
-// MARK: - Info Card Component
-
-struct InfoCard<Content: View>: View {
-    let title: String
-    let subtitle: String?
-    let content: Content
-
-    init(title: String, subtitle: String? = nil, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.subtitle = subtitle
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-
-                if let subtitle = subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            VStack(spacing: 12) {
-                content
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.white)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-    }
-}
-
-// MARK: - Info Row Component
-
-struct InfoRow: View {
-    let label: String
-    let value: String
-
-    var body: some View {
-        HStack {
-            Text(label)
-                .foregroundColor(.secondary)
-            Spacer()
-            Text(value)
-                .fontWeight(.medium)
-                .foregroundColor(.primary)
-        }
-        .font(.body)
-    }
-}
+// MARK: - Shared Components
+// Note: InfoCard and InfoRow are now defined in SharedComponents.swift
 
 #Preview {
     NavigationView {
@@ -1146,7 +1299,7 @@ struct InfoRow: View {
             cattle.sex = CattleSex.cow.rawValue
             cattle.color = "Black"
             cattle.markings = "White face"
-            cattle.currentStage = CattleStage.weanling.rawValue
+            cattle.currentStage = LegacyCattleStage.weanling.rawValue
             cattle.dateOfBirth = Calendar.current.date(byAdding: .month, value: -8, to: Date())
             cattle.notes = "Healthy and growing well"
             return cattle

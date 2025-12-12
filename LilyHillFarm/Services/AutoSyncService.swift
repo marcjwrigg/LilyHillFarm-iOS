@@ -29,6 +29,10 @@ class AutoSyncService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var isSyncing = false
 
+    // NEW: Network and queue management
+    private let networkMonitor = NetworkMonitor.shared
+    private let syncQueueManager = SyncQueueManager.shared
+
     // Flag to temporarily disable auto-sync (e.g., during pull operations)
     static var isEnabled = true
 
@@ -112,51 +116,70 @@ class AutoSyncService: ObservableObject {
         for object in sortedObjects {
             print("🔍 AutoSync: Processing object type: \(type(of: object))")
 
+            // Check if we're online - if not, queue for later
+            guard networkMonitor.isSuitableForSync else {
+                print("📵 AutoSync: Offline - queueing \(type(of: object)) for later")
+                queueOperation(for: object, operation: .create)
+                setSyncStatus(object, status: "pending")
+                continue
+            }
+
             do {
                 switch object {
                 case let contact as Contact:
                     print("📤 AutoSync: Pushing new contact \(contact.name ?? "unknown")")
                     _ = try await contactRepository.create(contact)
+                    setSyncStatus(contact, status: "synced")
 
                 case let cattle as Cattle:
                     print("📤 AutoSync: Pushing new cattle \(cattle.tagNumber ?? "unknown")")
                     _ = try await cattleRepository.create(cattle)
+                    setSyncStatus(cattle, status: "synced")
 
                 case let healthRecord as HealthRecord:
                     print("📤 AutoSync: Pushing new health record")
                     _ = try await healthRecordRepository.create(healthRecord)
+                    setSyncStatus(healthRecord, status: "synced")
 
                 case let pregnancy as PregnancyRecord:
                     print("📤 AutoSync: Pushing new pregnancy record")
                     _ = try await pregnancyRecordRepository.create(pregnancy)
+                    setSyncStatus(pregnancy, status: "synced")
 
                 case let calvingRecord as CalvingRecord:
                     print("📤 AutoSync: Pushing new calving record")
                     _ = try await calvingRecordRepository.create(calvingRecord)
+                    setSyncStatus(calvingRecord, status: "synced")
 
                 case let saleRecord as SaleRecord:
                     print("📤 AutoSync: Pushing new sale record")
                     _ = try await saleRecordRepository.create(saleRecord)
+                    setSyncStatus(saleRecord, status: "synced")
 
                 case let processingRecord as ProcessingRecord:
                     print("📤 AutoSync: Pushing new processing record")
                     _ = try await processingRecordRepository.create(processingRecord)
+                    setSyncStatus(processingRecord, status: "synced")
 
                 case let mortalityRecord as MortalityRecord:
                     print("📤 AutoSync: Pushing new mortality record")
                     _ = try await mortalityRecordRepository.create(mortalityRecord)
+                    setSyncStatus(mortalityRecord, status: "synced")
 
                 case let stageTransition as StageTransition:
                     print("📤 AutoSync: Pushing new stage transition")
                     _ = try await stageTransitionRepository.create(stageTransition)
+                    setSyncStatus(stageTransition, status: "synced")
 
                 case let photo as Photo:
                     print("📤 AutoSync: Pushing new photo")
                     try await photoRepository.pushToSupabase(photo)
+                    setSyncStatus(photo, status: "synced")
 
                 case let task as Task:
                     print("📤 AutoSync: Pushing new task \(task.title ?? "untitled")")
                     try await taskRepository.pushToSupabase(task)
+                    setSyncStatus(task, status: "synced")
 
                 default:
                     break
@@ -165,7 +188,7 @@ class AutoSyncService: ObservableObject {
                 // Handle foreign key constraint errors by deleting the invalid record
                 if error.code == "23503" {
                     print("⚠️ AutoSync: Deleting \(type(of: object)) due to missing relationship (foreign key constraint)")
-                    print("   Error details: \(error.message ?? "no message")")
+                    print("   Error details: \(error.message)")
                     if let hint = error.hint {
                         print("   Hint: \(hint)")
                     }
@@ -180,9 +203,15 @@ class AutoSyncService: ObservableObject {
                     }
                 } else {
                     print("❌ AutoSync: Failed to push \(type(of: object)): \(error)")
+                    // Queue for retry
+                    queueOperation(for: object, operation: .create)
+                    setSyncStatus(object, status: "pending")
                 }
             } catch {
                 print("❌ AutoSync: Failed to push \(type(of: object)): \(error)")
+                // Queue for retry
+                queueOperation(for: object, operation: .create)
+                setSyncStatus(object, status: "pending")
             }
         }
     }
@@ -331,6 +360,60 @@ class AutoSyncService: ObservableObject {
     }
 
     // MARK: - Helper Methods
+
+    /// Queue an operation for later retry
+    private func queueOperation(for object: NSManagedObject, operation: SyncOperation.OperationType) {
+        guard let id = object.value(forKey: "id") as? UUID else {
+            print("⚠️ AutoSync: Cannot queue object without ID")
+            return
+        }
+
+        let entityType = determineEntityType(for: object)
+        guard let entityType = entityType else {
+            print("⚠️ AutoSync: Unknown entity type: \(type(of: object))")
+            return
+        }
+
+        let syncOp = SyncOperation(entityType: entityType, entityId: id, operation: operation)
+        syncQueueManager.enqueue(syncOp)
+    }
+
+    /// Determine entity type for queue
+    private func determineEntityType(for object: NSManagedObject) -> SyncOperation.EntityType? {
+        switch object {
+        case is Contact:
+            return .contact
+        case is Cattle:
+            return .cattle
+        case is HealthRecord:
+            return .healthRecord
+        case is PregnancyRecord:
+            return .pregnancyRecord
+        case is CalvingRecord:
+            return .calvingRecord
+        case is SaleRecord:
+            return .saleRecord
+        case is ProcessingRecord:
+            return .processingRecord
+        case is MortalityRecord:
+            return .mortalityRecord
+        case is StageTransition:
+            return .stageTransition
+        case is Photo:
+            return .photo
+        case is Task:
+            return .task
+        default:
+            return nil
+        }
+    }
+
+    /// Set sync status on an entity
+    private func setSyncStatus(_ object: NSManagedObject, status: String) {
+        object.setValue(status, forKey: "syncStatus")
+        // Save synchronously to ensure status is persisted
+        try? context.save()
+    }
 
     /// Determines insertion priority to avoid foreign key constraint violations
     /// Lower numbers are inserted first

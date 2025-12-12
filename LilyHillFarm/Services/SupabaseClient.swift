@@ -32,6 +32,12 @@ class SupabaseManager: ObservableObject {
     /// Realtime service for live updates
     private var realtimeService: RealtimeService?
 
+    /// Network monitor for connectivity
+    private let networkMonitor = NetworkMonitor.shared
+
+    /// Sync queue manager for offline support
+    private let syncQueueManager = SyncQueueManager.shared
+
     /// UserDefaults key for tracking if photo backup has been done
     private let photoBackupCompletedKey = "PhotoBackupCompleted"
 
@@ -177,15 +183,25 @@ class SupabaseManager: ObservableObject {
         // Get the persistence controller's context
         let context = PersistenceController.shared.container.viewContext
 
-        // Create sync manager and perform full sync
-        let syncManager = SyncManager(context: context)
-        await syncManager.performFullSync()
-        print("✅ Initial sync completed successfully")
+        // Start realtime subscriptions immediately (non-blocking)
+        // User will see live updates while initial sync is in progress
+        let realtimeTask = Task {
+            await startRealtimeSubscriptions()
+        }
 
-        // Start realtime subscriptions
-        await startRealtimeSubscriptions()
+        // Perform full sync in parallel (non-blocking)
+        let syncTask = Task {
+            let syncManager = SyncManager(context: context)
+            await syncManager.performFullSync()
+            print("✅ Initial sync completed successfully")
+        }
 
-        // Photo backup disabled
+        // Both tasks run in parallel - realtime starts immediately
+        // while sync happens in the background
+        await realtimeTask.value
+        await syncTask.value
+
+        // DISABLED: Backup service temporarily disabled
         // await requestPermissionsAndBackupPhotos()
     }
 
@@ -211,12 +227,22 @@ class SupabaseManager: ObservableObject {
         // Get the persistence controller's context
         let context = PersistenceController.shared.container.viewContext
 
-        // Create sync manager and perform full sync
+        // Process sync queue first (push local changes that were made offline)
+        if networkMonitor.isConnected {
+            print("🔄 Processing offline sync queue...")
+            await syncQueueManager.processQueue()
+            print("✅ Sync queue processed")
+        }
+
+        // Then pull latest data from server
+        // Always perform incremental sync to catch changes that happened while app was closed
+        // Incremental sync is fast since it only fetches records modified since last sync
+        // First sync will automatically be a full sync (when lastSync == nil)
         let syncManager = SyncManager(context: context)
         await syncManager.performFullSync()
         print("✅ Foreground sync completed successfully")
 
-        // Photo backup disabled
+        // DISABLED: Backup service temporarily disabled
         // await runPhotoBackup()
     }
 
