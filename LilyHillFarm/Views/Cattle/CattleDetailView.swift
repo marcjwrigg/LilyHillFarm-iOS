@@ -39,24 +39,31 @@ struct CattleDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Header with photo
-                headerSection
+                // Header with photo (only show if photos exist)
+                if !cattle.sortedPhotos.isEmpty {
+                    headerSection
+                }
 
                 // Basic Information Card
                 InfoCard(title: "Basic Information", isExpanded: $isBasicInfoExpanded) {
-                    InfoRow(label: "Tag Number", value: cattle.tagNumber ?? "N/A")
-                    InfoRow(label: "Name", value: cattle.name ?? "Not set")
-                    InfoRow(label: "Sex", value: cattle.sex ?? "N/A")
-                    InfoRow(label: "Breed", value: cattle.breed?.name ?? "Unknown")
-                    InfoRow(label: "Type", value: cattle.cattleType ?? "N/A")
-                    InfoRow(label: "Color", value: cattle.color ?? "Not recorded")
-                    if let markings = cattle.markings, !markings.isEmpty {
-                        InfoRow(label: "Markings", value: markings)
-                    }
-                    if let weight = cattle.currentWeight as? Decimal, weight > 0 {
-                        InfoRow(label: "Current Weight", value: "\(weight as NSNumber) lbs")
-                    } else {
-                        InfoRow(label: "Current Weight", value: "Not recorded")
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: 16),
+                        GridItem(.flexible(), spacing: 16)
+                    ], alignment: .leading, spacing: 12) {
+                        InfoRow(label: "Tag Number", value: cattle.tagNumber ?? "N/A")
+                        InfoRow(label: "Name", value: cattle.name ?? "Not set")
+                        InfoRow(label: "Sex", value: cattle.sex ?? "N/A")
+                        InfoRow(label: "Breed", value: cattle.breed?.name ?? "Unknown")
+                        InfoRow(label: "Type", value: cattle.cattleType ?? "N/A")
+                        InfoRow(label: "Color", value: cattle.color ?? "Not recorded")
+                        if let markings = cattle.markings, !markings.isEmpty {
+                            InfoRow(label: "Markings", value: markings)
+                        }
+                        if let weight = cattle.currentWeight as? Decimal, weight > 0 {
+                            InfoRow(label: "Current Weight", value: "\(weight as NSNumber) lbs")
+                        } else {
+                            InfoRow(label: "Current Weight", value: "Not recorded")
+                        }
                     }
                 }
 
@@ -219,7 +226,26 @@ struct CattleDetailView: View {
                                     }
                                 }
 
-                                if let days = currentPregnancy.daysUntilDue {
+                                // Handle calving window vs single due date
+                                if let calvingStart = currentPregnancy.expectedCalvingStartDate,
+                                   let calvingEnd = currentPregnancy.expectedCalvingEndDate {
+                                    let daysUntilStart = Calendar.current.dateComponents([.day], from: Date(), to: calvingStart).day ?? 0
+                                    let daysUntilEnd = Calendar.current.dateComponents([.day], from: Date(), to: calvingEnd).day ?? 0
+
+                                    if daysUntilEnd < 0 {
+                                        Text("\(-daysUntilEnd) days past window")
+                                            .font(.caption)
+                                            .foregroundColor(.red)
+                                    } else if daysUntilStart <= 0 && daysUntilEnd >= 0 {
+                                        Text("In calving window (\(daysUntilEnd)d left)")
+                                            .font(.caption)
+                                            .foregroundColor(.orange)
+                                    } else {
+                                        Text("Window in \(daysUntilStart)-\(daysUntilEnd) days")
+                                            .font(.caption)
+                                            .foregroundColor(.blue)
+                                    }
+                                } else if let days = currentPregnancy.daysUntilDue {
                                     if days < 0 {
                                         Text("\(-days) days overdue")
                                             .font(.caption)
@@ -389,9 +415,20 @@ struct CattleDetailView: View {
                                     Text("Avg Days Post Partum")
                                         .foregroundColor(.secondary)
                                     Spacer()
-                                    Text("\(avgDays)")
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.blue)
+                                    VStack(alignment: .trailing, spacing: 4) {
+                                        Text("\(avgDays)")
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.blue)
+                                        let benchmark = BreedingBenchmarks.getDaysPostPartumBenchmark(days: avgDays)
+                                        Text(benchmark.label)
+                                            .font(.caption2)
+                                            .fontWeight(.medium)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(benchmark.color.opacity(0.15))
+                                            .foregroundColor(benchmark.color)
+                                            .cornerRadius(4)
+                                    }
                                 }
                             }
 
@@ -417,9 +454,20 @@ struct CattleDetailView: View {
                                     Text("Avg Days Between Calving")
                                         .foregroundColor(.secondary)
                                     Spacer()
-                                    Text("\(avgDays)")
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.purple)
+                                    VStack(alignment: .trailing, spacing: 4) {
+                                        Text("\(avgDays)")
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.purple)
+                                        let benchmark = BreedingBenchmarks.getDaysBetweenCalvingBenchmark(days: avgDays)
+                                        Text(benchmark.label)
+                                            .font(.caption2)
+                                            .fontWeight(.medium)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(benchmark.color.opacity(0.15))
+                                            .foregroundColor(benchmark.color)
+                                            .cornerRadius(4)
+                                    }
                                 }
                             }
                         }
