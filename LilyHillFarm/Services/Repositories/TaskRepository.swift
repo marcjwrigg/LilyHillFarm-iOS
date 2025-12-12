@@ -87,7 +87,7 @@ class TaskRepository: BaseSyncManager {
         print("  - Title: \(dto.title)")
         print("  - Farm ID: \(dto.farmId)")
         print("  - Status: \(dto.status)")
-        print("  - Related Cattle ID: \(dto.relatedCattleId?.uuidString ?? "nil")")
+        print("  - Related Cattle ID: \(dto.relatedCattleId?.uuidString ?? "nil" as String)")
 
         do {
             // Insert without selecting back to avoid RLS issues

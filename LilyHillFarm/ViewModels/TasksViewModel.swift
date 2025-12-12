@@ -9,6 +9,7 @@ import Foundation
 import Combine
 import SwiftUI
 import Supabase
+import CoreData
 
 @MainActor
 class TasksViewModel: ObservableObject {
@@ -17,6 +18,23 @@ class TasksViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let supabase = SupabaseManager.shared
+    private let context: NSManagedObjectContext
+    private let taskRepository: TaskRepository
+    private var cancellables = Set<AnyCancellable>()
+
+    init(context: NSManagedObjectContext = PersistenceController.shared.container.viewContext) {
+        self.context = context
+        self.taskRepository = TaskRepository(context: context)
+
+        // Observe Core Data changes
+        NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    await self?.loadTasksFromCoreData()
+                }
+            }
+            .store(in: &cancellables)
+    }
 
     // MARK: - Load Tasks
 
@@ -25,79 +43,14 @@ class TasksViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            guard let userId = supabase.userId else {
-                throw RepositoryError.notAuthenticated
-            }
+            // First, sync from Supabase to Core Data
+            print("🔄 Syncing tasks from Supabase to Core Data")
+            try await taskRepository.syncFromSupabase()
 
-            print("🔄 Loading all tasks for authenticated user: \(userId)")
+            // Then load from Core Data
+            await loadTasksFromCoreData()
 
-            // Load ALL tasks for authenticated users (not filtered by user_id or assigned_to)
-            let taskDTOs: [TaskDTO] = try await supabase.client
-                .from(SupabaseConfig.Tables.tasks)
-                .select()
-                .order("due_date", ascending: true)
-                .order("priority", ascending: false)
-                .execute()
-                .value
-
-            print("✅ Loaded \(taskDTOs.count) total tasks from Supabase")
-
-            // Fetch related cattle data (matching web app logic)
-            let cattleIds = Set(taskDTOs.compactMap { $0.relatedCattleId })
-
-            var cattleMap: [UUID: (id: UUID, tagNumber: String, name: String?)] = [:]
-
-            if !cattleIds.isEmpty {
-                print("🔄 Fetching cattle data for \(cattleIds.count) cattle...")
-
-                struct CattleData: Decodable {
-                    let id: UUID
-                    let tagNumber: String
-                    let name: String?
-
-                    enum CodingKeys: String, CodingKey {
-                        case id
-                        case tagNumber = "tag_number"
-                        case name
-                    }
-                }
-
-                let cattleData: [CattleData] = try await supabase.client
-                    .from(SupabaseConfig.Tables.cattle)
-                    .select("id, tag_number, name")
-                    .in("id", values: cattleIds.map { $0.uuidString })
-                    .execute()
-                    .value
-
-                cattleMap = Dictionary(uniqueKeysWithValues: cattleData.map {
-                    ($0.id, (id: $0.id, tagNumber: $0.tagNumber, name: $0.name))
-                })
-
-                print("✅ Fetched cattle data for \(cattleData.count) cattle")
-            }
-
-            // Map tasks with cattle tags
-            self.tasks = taskDTOs.map { dto in
-                var item = TaskItem(from: dto)
-                if let relatedCattleId = dto.relatedCattleId, let cattle = cattleMap[relatedCattleId] {
-                    item.cattleTag = cattle.tagNumber
-                }
-                return item
-            }
-
-            print("✅ Tasks loaded and mapped successfully")
-            print("📊 Task breakdown by status:")
-            print("  - Pending: \(self.tasks.filter { $0.status == "pending" }.count)")
-            print("  - In Progress: \(self.tasks.filter { $0.status == "in_progress" }.count)")
-            print("  - Completed: \(self.tasks.filter { $0.status == "completed" }.count)")
-            print("  - Other: \(self.tasks.filter { $0.status != "pending" && $0.status != "in_progress" && $0.status != "completed" }.count)")
-
-            // Log the 5 most recent tasks
-            let recentTasks = self.tasks.sorted { ($0.createdAt) > ($1.createdAt) }.prefix(5)
-            print("📋 5 most recent tasks:")
-            for task in recentTasks {
-                print("  - [\(task.status)] \(task.title) (created: \(task.createdAt))")
-            }
+            print("✅ Tasks loaded and synced successfully")
 
         } catch {
             print("❌ Failed to load tasks: \(error)")
@@ -107,57 +60,65 @@ class TasksViewModel: ObservableObject {
         isLoading = false
     }
 
+    private func loadTasksFromCoreData() async {
+        let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
+
+        // Sort by due date and priority
+        fetchRequest.sortDescriptors = [
+            NSSortDescriptor(key: "dueDate", ascending: true),
+            NSSortDescriptor(key: "priority", ascending: false)
+        ]
+
+        // Filter out soft-deleted tasks
+        fetchRequest.predicate = NSPredicate(format: "deletedAt == nil")
+
+        do {
+            let coreDataTasks = try context.fetch(fetchRequest)
+            self.tasks = coreDataTasks.map { TaskItem(from: $0) }
+
+            print("📊 Loaded \(self.tasks.count) tasks from Core Data")
+            print("  - Pending: \(self.tasks.filter { $0.status == "pending" }.count)")
+            print("  - In Progress: \(self.tasks.filter { $0.status == "in_progress" }.count)")
+            print("  - Completed: \(self.tasks.filter { $0.status == "completed" }.count)")
+
+        } catch {
+            print("❌ Failed to load tasks from Core Data: \(error)")
+            errorMessage = error.localizedDescription
+        }
+    }
+
     // MARK: - Create Task
 
     func createTask(_ task: TaskItem) async {
         do {
-            // Get farmId from farm_users table
-            guard let userId = supabase.userId else {
-                throw RepositoryError.notAuthenticated
+            // Create in Core Data first
+            let newTask = Task(context: context)
+            newTask.id = task.id
+            newTask.title = task.title
+            newTask.taskDescription = task.description
+            newTask.taskType = task.category
+            newTask.priority = task.priority
+            newTask.status = task.status
+            newTask.dueDate = task.dueDate
+            newTask.completedAt = task.completedAt
+            newTask.createdAt = task.createdAt
+            newTask.updatedAt = Date()
+            newTask.syncStatus = "pending"
+
+            // Resolve cattle relationship if provided
+            if let cattleId = task.relatedCattleId {
+                let cattleFetch: NSFetchRequest<Cattle> = Cattle.fetchRequest()
+                cattleFetch.predicate = NSPredicate(format: "id == %@", cattleId as CVarArg)
+                if let cattle = try? context.fetch(cattleFetch).first {
+                    newTask.cattle = cattle
+                }
             }
 
-            struct FarmUser: Codable {
-                let farm_id: UUID
-            }
+            // Save to Core Data
+            try context.save()
+            print("✅ Task created in Core Data: \(task.title)")
 
-            let farmUsers: [FarmUser] = try await supabase.client
-                .from("farm_users")
-                .select("farm_id")
-                .eq("user_id", value: userId.uuidString)
-                .limit(1)
-                .execute()
-                .value
-
-            guard let farmId = farmUsers.first?.farm_id else {
-                throw RepositoryError.syncFailed("No farm found for user")
-            }
-
-            let dto = TaskDTO(
-                id: task.id,
-                farmId: farmId,
-                title: task.title,
-                description: task.description,
-                category: task.category,
-                priority: task.priority,
-                status: task.status,
-                dueDate: task.dueDate?.toISO8601String(),
-                assignedToUserId: nil,
-                relatedCattleId: task.relatedCattleId,
-                completedAt: task.completedAt?.toISO8601String(),
-                deletedAt: nil,
-                createdAt: task.createdAt.toISO8601String(),
-                updatedAt: task.createdAt.toISO8601String()
-            )
-
-            let created: TaskDTO = try await supabase.client
-                .from(SupabaseConfig.Tables.tasks)
-                .insert(dto)
-                .select()
-                .single()
-                .execute()
-                .value
-
-            tasks.append(TaskItem(from: created))
+            // AutoSyncService will automatically detect and sync to Supabase
 
         } catch {
             print("❌ Failed to create task: \(error)")
@@ -169,38 +130,27 @@ class TasksViewModel: ObservableObject {
 
     func toggleTaskCompletion(_ task: TaskItem) async {
         do {
+            // Fetch from Core Data
+            let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@", task.id as CVarArg)
+            fetchRequest.fetchLimit = 1
+
+            guard let coreDataTask = try context.fetch(fetchRequest).first else {
+                throw RepositoryError.notFound
+            }
+
+            // Toggle completion
             let newStatus = task.isCompleted ? "pending" : "completed"
-            let completedAt = newStatus == "completed" ? Date().toISO8601String() : nil
+            coreDataTask.status = newStatus
+            coreDataTask.completedAt = newStatus == "completed" ? Date() : nil
+            coreDataTask.updatedAt = Date()
+            coreDataTask.syncStatus = "pending"
 
-            struct TaskUpdate: Encodable {
-                let status: String
-                let completedAt: String?
-                let updatedAt: String
+            // Save to Core Data
+            try context.save()
+            print("✅ Task completion toggled in Core Data: \(task.title)")
 
-                enum CodingKeys: String, CodingKey {
-                    case status
-                    case completedAt = "completed_at"
-                    case updatedAt = "updated_at"
-                }
-            }
-
-            let update = TaskUpdate(
-                status: newStatus,
-                completedAt: completedAt,
-                updatedAt: Date().toISO8601String()
-            )
-
-            try await supabase.client
-                .from(SupabaseConfig.Tables.tasks)
-                .update(update)
-                .eq("id", value: task.id.uuidString)
-                .execute()
-
-            // Update local task
-            if let index = tasks.firstIndex(where: { $0.id == task.id }) {
-                tasks[index].status = newStatus
-                tasks[index].completedAt = newStatus == "completed" ? Date() : nil
-            }
+            // AutoSyncService will automatically detect and sync to Supabase
 
         } catch {
             print("❌ Failed to update task: \(error)")
@@ -212,13 +162,25 @@ class TasksViewModel: ObservableObject {
 
     func deleteTask(_ task: TaskItem) async {
         do {
-            try await supabase.client
-                .from(SupabaseConfig.Tables.tasks)
-                .delete()
-                .eq("id", value: task.id.uuidString)
-                .execute()
+            // Fetch from Core Data
+            let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %@", task.id as CVarArg)
+            fetchRequest.fetchLimit = 1
 
-            tasks.removeAll { $0.id == task.id }
+            guard let coreDataTask = try context.fetch(fetchRequest).first else {
+                throw RepositoryError.notFound
+            }
+
+            // Soft delete by setting deletedAt
+            coreDataTask.deletedAt = Date()
+            coreDataTask.updatedAt = Date()
+            coreDataTask.syncStatus = "pending"
+
+            // Save to Core Data
+            try context.save()
+            print("✅ Task soft-deleted in Core Data: \(task.title)")
+
+            // AutoSyncService will automatically detect and sync to Supabase
 
         } catch {
             print("❌ Failed to delete task: \(error)")
