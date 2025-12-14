@@ -94,16 +94,17 @@ class TaskRepository: BaseSyncManager {
         print("  - Related Cattle ID: \(dto.cattleId?.uuidString ?? "nil" as String)")
 
         do {
-            // Insert without selecting back to avoid RLS issues
+            // Use upsert to handle both insert and update cases
+            // This prevents duplicate key errors if the task was already synced
             try await supabase.client
                 .from(SupabaseConfig.Tables.tasks)
-                .insert(dto)
+                .upsert(dto)
                 .execute()
 
-            print("✅ TaskRepository.create() - Insert successful")
+            print("✅ TaskRepository.create() - Upsert successful")
             return dto
         } catch {
-            print("❌ TaskRepository.create() - Insert failed: \(error)")
+            print("❌ TaskRepository.create() - Upsert failed: \(error)")
             throw error
         }
     }
