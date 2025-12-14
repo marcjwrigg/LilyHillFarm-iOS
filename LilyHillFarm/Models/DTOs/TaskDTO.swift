@@ -13,7 +13,7 @@ struct TaskDTO: Codable {
     let farmId: UUID?  // Optional since database migration may have NULL values
     let title: String
     let description: String?
-    let category: String
+    let taskType: String
     let priority: String
     let status: String
     let dueDate: String?
@@ -29,7 +29,7 @@ struct TaskDTO: Codable {
         case farmId = "farm_id"
         case title
         case description
-        case category
+        case taskType = "task_type"
         case priority
         case status
         case dueDate = "due_date"
@@ -47,7 +47,7 @@ struct TaskDTO: Codable {
         farmId: UUID?,
         title: String,
         description: String?,
-        category: String,
+        taskType: String,
         priority: String,
         status: String,
         dueDate: String?,
@@ -62,7 +62,7 @@ struct TaskDTO: Codable {
         self.farmId = farmId
         self.title = title
         self.description = description
-        self.category = category
+        self.taskType = taskType
         self.priority = priority
         self.status = status
         self.dueDate = dueDate
@@ -74,39 +74,6 @@ struct TaskDTO: Codable {
         self.updatedAt = updatedAt
     }
 
-    // Custom decoder to handle both "category" (new) and "task_type" (old) column names
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-
-        self.id = try container.decode(UUID.self, forKey: .id)
-        self.farmId = try? container.decodeIfPresent(UUID.self, forKey: .farmId)
-        self.title = try container.decode(String.self, forKey: .title)
-        self.description = try container.decodeIfPresent(String.self, forKey: .description)
-
-        // Try "category" first, fall back to "task_type" for old records
-        if let category = try? container.decode(String.self, forKey: .category) {
-            self.category = category
-        } else {
-            // Try old "task_type" column name
-            let legacyContainer = try decoder.container(keyedBy: LegacyCodingKeys.self)
-            self.category = try legacyContainer.decode(String.self, forKey: .taskType)
-        }
-
-        self.priority = try container.decode(String.self, forKey: .priority)
-        self.status = try container.decode(String.self, forKey: .status)
-        self.dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
-        self.assignedToUserId = try container.decodeIfPresent(UUID.self, forKey: .assignedToUserId)
-        self.relatedCattleId = try container.decodeIfPresent(UUID.self, forKey: .relatedCattleId)
-        self.completedAt = try container.decodeIfPresent(String.self, forKey: .completedAt)
-        self.deletedAt = try container.decodeIfPresent(String.self, forKey: .deletedAt)
-        self.createdAt = try container.decode(String.self, forKey: .createdAt)
-        self.updatedAt = try container.decode(String.self, forKey: .updatedAt)
-    }
-
-    // Legacy coding keys for old database schema
-    private enum LegacyCodingKeys: String, CodingKey {
-        case taskType = "task_type"
-    }
 }
 
 // MARK: - Core Data Conversion
@@ -118,7 +85,7 @@ extension TaskDTO {
         self.farmId = farmId
         self.title = task.title ?? ""
         self.description = task.taskDescription
-        self.category = task.taskType ?? "general"  // iOS uses "taskType", DB uses "category"
+        self.taskType = task.taskType ?? "general"
         self.priority = task.priority ?? "medium"
         self.status = task.status ?? "pending"
         self.dueDate = task.dueDate?.toISO8601String()
@@ -137,7 +104,7 @@ extension TaskDTO {
         task.farmId = self.farmId
         task.title = self.title
         task.taskDescription = self.description
-        task.taskType = self.category  // DB uses "category", iOS uses "taskType"
+        task.taskType = self.taskType
         task.priority = self.priority
         task.status = self.status
         task.dueDate = self.dueDate?.toDate()
