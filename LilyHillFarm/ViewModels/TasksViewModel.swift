@@ -297,7 +297,7 @@ struct TaskItem: Identifiable {
         self.id = dto.id
         self.title = dto.title
         self.description = dto.description
-        self.category = dto.category
+        self.category = dto.taskType
         self.priority = dto.priority
         self.status = dto.status
         self.dueDate = dto.dueDate?.toDate()
