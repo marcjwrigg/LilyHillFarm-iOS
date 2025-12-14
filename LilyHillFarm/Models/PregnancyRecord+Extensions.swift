@@ -68,10 +68,17 @@ extension PregnancyRecord {
     }
 
     var displayMethod: String {
-        guard let method = BreedingMethod(rawValue: breedingMethod ?? "") else {
-            return "Unknown"
+        guard let methodValue = breedingMethod, !methodValue.isEmpty else {
+            return "Not specified"
         }
-        return method.displayName
+
+        // Try to parse as BreedingMethod enum
+        if let method = BreedingMethod(rawValue: methodValue) {
+            return method.displayName
+        }
+
+        // Fallback: return the raw value capitalized
+        return methodValue.capitalized
     }
 
     var daysSinceBreeding: Int {
@@ -81,7 +88,31 @@ extension PregnancyRecord {
     }
 
     var gestationDays: Int? {
-        daysSinceBreeding
+        guard let breedingDate = breedingDate else { return nil }
+
+        // If pregnancy has been completed (calved), calculate actual gestation length
+        if status == PregnancyStatus.calved.rawValue {
+            // Try to find the calving date from related calving records
+            // We need to fetch the calving record with this pregnancy's ID
+            guard let context = managedObjectContext,
+                  let pregnancyId = id else {
+                return daysSinceBreeding
+            }
+
+            let fetchRequest: NSFetchRequest<CalvingRecord> = CalvingRecord.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "pregnancyId == %@", pregnancyId as CVarArg)
+            fetchRequest.fetchLimit = 1
+
+            if let calvingRecord = try? context.fetch(fetchRequest).first,
+               let calvingDate = calvingRecord.calvingDate {
+                // Calculate actual gestation from breeding to calving
+                let components = Calendar.current.dateComponents([.day], from: breedingDate, to: calvingDate)
+                return components.day ?? daysSinceBreeding
+            }
+        }
+
+        // For active pregnancies, return days since breeding (up to today)
+        return daysSinceBreeding
     }
 
     var isOverdue: Bool {
@@ -112,7 +143,11 @@ extension PregnancyRecord {
     }
 
     var displayStatus: String {
-        status ?? "Unknown"
+        guard let statusValue = status,
+              let pregnancyStatus = PregnancyStatus(rawValue: statusValue) else {
+            return "Unknown"
+        }
+        return pregnancyStatus.displayName
     }
 
     var isActive: Bool {

@@ -23,8 +23,8 @@ struct CalvingDetailView: View {
         // Fetch pregnancy record for this calving
         _pregnancyRecords = FetchRequest<PregnancyRecord>(
             sortDescriptors: [],
-            predicate: calvingRecord.pregnancyID != nil
-                ? NSPredicate(format: "id == %@", calvingRecord.pregnancyID! as CVarArg)
+            predicate: calvingRecord.pregnancyId != nil
+                ? NSPredicate(format: "id == %@", calvingRecord.pregnancyId! as CVarArg)
                 : NSPredicate(value: false)
         )
     }
@@ -61,9 +61,23 @@ struct CalvingDetailView: View {
                         .font(.title2)
                         .fontWeight(.bold)
 
-                    Text(calvingRecord.displayDate)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                    // Show calving date
+                    if let calvingDate = calvingRecord.calvingDate {
+                        Text("Calved: \(formatDate(calvingDate))")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
+                        // Show days since calving
+                        if let daysSince = daysSinceCalving(calvingDate) {
+                            Text("\(daysSince) day\(daysSince == 1 ? "" : "s") ago")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
+                    } else {
+                        Text("Date not recorded")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
 
                     // Difficulty Badge
                     HStack {
@@ -146,29 +160,48 @@ struct CalvingDetailView: View {
                 }
 
                 // Sire Information
-                if let calf = calvingRecord.calf, let sire = calf.sire {
-                    InfoCard(title: "Sire") {
-                        NavigationLink(destination: CattleDetailView(cattle: sire)) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(sire.displayName)
-                                        .font(.headline)
-                                    Text(sire.tagNumber ?? "No Tag")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    if let breed = sire.breed?.name {
-                                        Text(breed)
+                if let calf = calvingRecord.calf {
+                    if let sire = calf.sire {
+                        // Internal bull
+                        InfoCard(title: "Sire") {
+                            NavigationLink(destination: CattleDetailView(cattle: sire)) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(sire.displayName)
+                                            .font(.headline)
+                                        Text(sire.tagNumber ?? "No Tag")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
+                                        if let breed = sire.breed?.name {
+                                            Text(breed)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                 }
-                                Spacer()
-                                Image(systemName: "chevron.right")
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else if let externalSireName = calf.externalSireName, !externalSireName.isEmpty {
+                        // AI bull (external)
+                        InfoCard(title: "Sire") {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(externalSireName)
+                                    .font(.headline)
+                                Text("AI Bull")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
+                                if let registration = calf.externalSireRegistration, !registration.isEmpty {
+                                    Text("Reg: \(registration)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
-                        .buttonStyle(.plain)
                     }
                 }
 
@@ -333,6 +366,12 @@ struct CalvingDetailView: View {
         formatter.timeStyle = .none
         return formatter.string(from: date)
     }
+
+    private func daysSinceCalving(_ calvingDate: Date) -> Int? {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.day], from: calvingDate, to: Date())
+        return components.day
+    }
 }
 
 #Preview {
@@ -357,7 +396,7 @@ struct CalvingDetailView: View {
             calf.dateOfBirth = Date()
             calf.dam = dam
             calf.sire = sire
-            calf.currentStage = CattleStage.calf.rawValue
+            calf.currentStage = LegacyCattleStage.calf.rawValue
 
             let calving = CalvingRecord.create(for: dam, in: context)
             calving.calvingDate = Date()

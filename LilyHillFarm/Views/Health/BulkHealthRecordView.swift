@@ -7,23 +7,61 @@
 
 import SwiftUI
 internal import CoreData
+import Supabase
+
+// Simple struct to hold health condition data from Supabase
+struct HealthConditionItemBulk: Identifiable, Hashable {
+    let id: UUID
+    let name: String
+    let description: String?
+}
 
 struct BulkHealthRecordView: View {
     let selectedCattle: [Cattle]
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
 
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \HealthRecordType.name, ascending: true)],
+        predicate: NSPredicate(format: "isActive == YES AND deletedAt == nil"),
+        animation: .default)
+    private var healthRecordTypes: FetchedResults<HealthRecordType>
+
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Medication.name, ascending: true)],
+        predicate: NSPredicate(format: "isActive == YES AND deletedAt == nil"),
+        animation: .default)
+    private var medications: FetchedResults<Medication>
+
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Veterinarian.name, ascending: true)],
+        predicate: NSPredicate(format: "isActive == YES AND deletedAt == nil"),
+        animation: .default)
+    private var veterinarians: FetchedResults<Veterinarian>
+
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \TreatmentPlan.name, ascending: true)],
+        predicate: NSPredicate(format: "deletedAt == nil"),
+        animation: .default)
+    private var treatmentPlans: FetchedResults<TreatmentPlan>
+
     // Health Record Fields
     @State private var date = Date()
-    @State private var recordType: HealthRecordType = .treatment
-    @State private var condition = ""
+    @State private var selectedRecordType: HealthRecordType?
+    @State private var selectedCondition: HealthConditionItemBulk?
     @State private var treatment = ""
-    @State private var medication = ""
+    @State private var selectedTreatmentPlan: TreatmentPlan?
+    @State private var selectedMedications: Set<Medication> = []
+    @State private var showMedicationPicker = false
     @State private var dosage = ""
     @State private var administrationMethod: AdministrationMethod = .injection
-    @State private var veterinarian = ""
+    @State private var selectedVeterinarian: Veterinarian?
     @State private var cost = ""
     @State private var notes = ""
+
+    // Health Conditions
+    @State private var healthConditions: [HealthConditionItemBulk] = []
+    @State private var isLoadingConditions = false
 
     // Validation
     @State private var showingError = false
@@ -74,19 +112,89 @@ struct BulkHealthRecordView: View {
                 Section("Record Details") {
                     DatePicker("Date", selection: $date, displayedComponents: [.date])
 
-                    Picker("Type", selection: $recordType) {
-                        ForEach(HealthRecordType.allCases) { type in
-                            Text(type.rawValue).tag(type)
+                    Picker("Type", selection: $selectedRecordType) {
+                        Text("Select Type").tag(nil as HealthRecordType?)
+                        ForEach(healthRecordTypes) { type in
+                            Text(type.displayValue).tag(type as HealthRecordType?)
+                        }
+                    }
+                }
+
+                // Condition Section
+                Section("Condition") {
+                    if isLoadingConditions {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading conditions...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        Picker("Condition *", selection: $selectedCondition) {
+                            Text("Select Condition").tag(nil as HealthConditionItemBulk?)
+                            ForEach(healthConditions) { condition in
+                                Text(condition.name).tag(condition as HealthConditionItemBulk?)
+                            }
+                        }
+                        .onChange(of: selectedCondition) {
+                            // Auto-populate notes with condition description
+                            if let condition = selectedCondition, let description = condition.description, !description.isEmpty {
+                                if notes.isEmpty {
+                                    notes = description
+                                }
+                            }
                         }
                     }
 
-                    TextField("Condition/Diagnosis", text: $condition)
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 60)
+                }
+
+                // Treatment Details
+                Section("Treatment") {
                     TextField("Treatment", text: $treatment)
+                }
+
+                // Treatment Plan Section
+                Section("Treatment Plan") {
+                    Picker("Treatment Plan", selection: $selectedTreatmentPlan) {
+                        Text("None").tag(nil as TreatmentPlan?)
+                        ForEach(treatmentPlans) { plan in
+                            Text(plan.displayValue).tag(plan as TreatmentPlan?)
+                        }
+                    }
+
+                    if let plan = selectedTreatmentPlan {
+                        if let condition = plan.condition {
+                            HStack {
+                                Text("Condition:")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text(condition)
+                            }
+                        }
+                        if let description = plan.planDescription {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Description:")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                                Text(description)
+                                    .font(.body)
+                            }
+                        }
+                    }
                 }
 
                 // Medication Section
                 Section("Medication") {
-                    TextField("Medication Name", text: $medication)
+                    MultiSelectDisplay(
+                        selectedItems: selectedMedications,
+                        itemLabel: { $0.displayValue },
+                        placeholder: "Select medications",
+                        onTap: { showMedicationPicker = true }
+                    )
+
                     TextField("Dosage (per animal)", text: $dosage)
 
                     Picker("Administration Method", selection: $administrationMethod) {
@@ -118,7 +226,12 @@ struct BulkHealthRecordView: View {
                         }
                     }
 
-                    TextField("Veterinarian (optional)", text: $veterinarian)
+                    Picker("Veterinarian", selection: $selectedVeterinarian) {
+                        Text("Select...").tag(nil as Veterinarian?)
+                        ForEach(veterinarians) { vet in
+                            Text(vet.displayValue).tag(vet as Veterinarian?)
+                        }
+                    }
                 }
 
                 // Notes
@@ -131,6 +244,9 @@ struct BulkHealthRecordView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .onAppear {
+                loadHealthConditions()
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -149,6 +265,14 @@ struct BulkHealthRecordView: View {
             } message: {
                 Text(errorMessage)
             }
+            .sheet(isPresented: $showMedicationPicker) {
+                MultiSelectPicker(
+                    title: "Select Medications",
+                    items: Array(medications),
+                    selectedItems: $selectedMedications,
+                    itemLabel: { $0.displayValue }
+                )
+            }
         }
     }
 
@@ -156,8 +280,8 @@ struct BulkHealthRecordView: View {
 
     private func saveBulkRecords() {
         // Validation
-        if condition.trimmingCharacters(in: .whitespaces).isEmpty {
-            errorMessage = "Please enter a condition or diagnosis"
+        guard let condition = selectedCondition else {
+            errorMessage = "Please select a condition"
             showingError = true
             return
         }
@@ -175,16 +299,27 @@ struct BulkHealthRecordView: View {
 
         // Create health records for each selected animal
         for cattle in selectedCattle {
-            let record = HealthRecord.create(for: cattle, type: recordType, in: viewContext)
+            // Create record with default type (will be overridden below with dynamic type)
+            let record = HealthRecord.create(for: cattle, type: .treatment, in: viewContext)
             record.date = date
-            record.condition = condition.trimmingCharacters(in: .whitespaces)
+            record.condition = condition.name
+
+            // Save record type ID and name from dynamic lookup
+            record.recordTypeId = selectedRecordType?.id
+            record.recordType = selectedRecordType?.name
+
+            // Save treatment plan relationship
+            record.treatmentPlan = selectedTreatmentPlan
 
             if !treatment.isEmpty {
                 record.treatment = treatment.trimmingCharacters(in: .whitespaces)
             }
 
-            if !medication.isEmpty {
-                record.medication = medication.trimmingCharacters(in: .whitespaces)
+            // Save medications as comma-separated names (for backward compatibility)
+            // and as UUID array (for future use)
+            if !selectedMedications.isEmpty {
+                record.medication = selectedMedications.map { $0.name ?? "Unknown" }.joined(separator: ", ")
+                record.medicationIds = selectedMedications.toUUIDArray() as NSArray
             }
 
             if !dosage.isEmpty {
@@ -193,9 +328,9 @@ struct BulkHealthRecordView: View {
 
             record.administrationMethod = administrationMethod.rawValue
 
-            if !veterinarian.isEmpty {
-                record.veterinarian = veterinarian.trimmingCharacters(in: .whitespaces)
-            }
+            // Save veterinarian ID and name
+            record.veterinarianId = selectedVeterinarian?.id
+            record.veterinarian = selectedVeterinarian?.name
 
             if let costValue = costValue {
                 record.cost = NSDecimalNumber(decimal: costValue)
@@ -213,6 +348,42 @@ struct BulkHealthRecordView: View {
         } catch {
             errorMessage = "Failed to save records: \(error.localizedDescription)"
             showingError = true
+        }
+    }
+
+    // MARK: - Load Health Conditions
+
+    private func loadHealthConditions() {
+        isLoadingConditions = true
+
+        _Concurrency.Task {
+            do {
+                // Fetch health conditions directly from Supabase
+                guard SupabaseConfig.isConfigured else {
+                    print("⚠️ Supabase not configured, skipping health conditions load")
+                    isLoadingConditions = false
+                    return
+                }
+
+                struct HealthConditionRow: Decodable {
+                    let id: UUID
+                    let name: String
+                    let description: String?
+                }
+
+                let response: [HealthConditionRow] = try await SupabaseManager.shared.client
+                    .from("health_conditions")
+                    .select()
+                    .order("name", ascending: true)
+                    .execute()
+                    .value
+
+                healthConditions = response.map { HealthConditionItemBulk(id: $0.id, name: $0.name, description: $0.description) }
+                isLoadingConditions = false
+            } catch {
+                print("Failed to load health conditions: \(error)")
+                isLoadingConditions = false
+            }
         }
     }
 }

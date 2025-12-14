@@ -11,6 +11,7 @@ internal import CoreData
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @StateObject private var autoSync: AutoSyncService
+    @State private var selectedTab: Int = 0
 
     init() {
         let context = PersistenceController.shared.container.viewContext
@@ -19,13 +20,14 @@ struct ContentView: View {
 
     var body: some View {
         #if os(iOS)
-        TabView {
+        TabView(selection: $selectedTab) {
             NavigationStack {
                 DashboardView()
             }
             .tabItem {
                 Label("Dashboard", systemImage: "chart.bar")
             }
+            .tag(0)
 
             NavigationStack {
                 CattleListView()
@@ -33,13 +35,18 @@ struct ContentView: View {
             .tabItem {
                 Label("Herd", systemImage: "pawprint")
             }
+            .tag(1)
 
-            NavigationStack {
-                BreedingDashboardView()
-            }
+            // Marc AI Chat
+            ChatView(
+                aiService: AIService(supabaseManager: SupabaseManager.shared),
+                supabaseManager: SupabaseManager.shared
+            )
             .tabItem {
-                Label("Breeding", systemImage: "heart.circle")
+                Image("marc-tab-icon")
+                    .renderingMode(.original)
             }
+            .tag(2)
 
             NavigationStack {
                 HealthDashboardView()
@@ -47,6 +54,7 @@ struct ContentView: View {
             .tabItem {
                 Label("Health", systemImage: "heart.text.square")
             }
+            .tag(3)
 
             NavigationStack {
                 MoreView()
@@ -54,6 +62,10 @@ struct ContentView: View {
             .tabItem {
                 Label("More", systemImage: "ellipsis.circle")
             }
+            .tag(4)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToDashboard"))) { _ in
+            selectedTab = 0
         }
         .environment(\.managedObjectContext, viewContext)
         #elseif os(macOS)
@@ -201,12 +213,11 @@ struct DashboardView: View {
         }.count
     }
 
-    var cattleByStage: [(stage: CattleStage, count: Int)] {
-        var dict: [CattleStage: Int] = [:]
+    var cattleByStage: [(stage: String, count: Int)] {
+        var dict: [String: Int] = [:]
         for animal in activeCattle {
-            if let stage = CattleStage(rawValue: animal.currentStage ?? "") {
-                dict[stage, default: 0] += 1
-            }
+            let stageName = animal.currentStage ?? "Unknown"
+            dict[stageName, default: 0] += 1
         }
         // Sort by count descending
         return dict.map { (stage: $0.key, count: $0.value) }
@@ -227,11 +238,10 @@ struct DashboardView: View {
 
     private var dashboardHeader: some View {
         VStack(spacing: 4) {
-            Image("longlogo")
+            Image("logo")
                 .resizable()
                 .scaledToFit()
-                .frame(height: 40)
-                .padding(.horizontal, 60)
+                .frame(height: 100)
         }
         .padding(.top)
     }
@@ -274,7 +284,7 @@ struct DashboardView: View {
                                 Text("\(item.count)")
                                     .font(.title2)
                                     .fontWeight(.bold)
-                                Text(item.stage.shortName)
+                                Text(item.stage)
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                                     .lineLimit(1)

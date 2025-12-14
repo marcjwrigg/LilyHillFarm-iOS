@@ -13,12 +13,18 @@ struct RecordDeceasedView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
 
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Veterinarian.name, ascending: true)],
+        predicate: NSPredicate(format: "isActive == YES AND deletedAt == nil"),
+        animation: .default)
+    private var veterinarians: FetchedResults<Veterinarian>
+
     // Death Details
     @State private var deathDate = Date()
     @State private var cause = ""
     @State private var causeCategory = ""
     @State private var disposalMethod = ""
-    @State private var veterinarian = ""
+    @State private var selectedVeterinarian: Veterinarian?
     @State private var necropsyPerformed = false
     @State private var necropsyResults = ""
     @State private var reportedToAuthorities = false
@@ -84,7 +90,12 @@ struct RecordDeceasedView: View {
 
                 // Veterinary Information
                 Section("Veterinary Information") {
-                    TextField("Veterinarian (Optional)", text: $veterinarian)
+                    Picker("Veterinarian", selection: $selectedVeterinarian) {
+                        Text("Select...").tag(nil as Veterinarian?)
+                        ForEach(veterinarians) { vet in
+                            Text(vet.displayValue).tag(vet as Veterinarian?)
+                        }
+                    }
 
                     Toggle("Necropsy Performed", isOn: $necropsyPerformed)
 
@@ -193,8 +204,10 @@ struct RecordDeceasedView: View {
             mortalityRecord.disposalMethod = disposalMethod
         }
 
-        if !veterinarian.isEmpty {
-            mortalityRecord.veterinarian = veterinarian.trimmingCharacters(in: .whitespaces)
+        // Save veterinarian ID and name
+        mortalityRecord.veterinarianId = selectedVeterinarian?.id
+        if let vetName = selectedVeterinarian?.name {
+            mortalityRecord.veterinarian = vetName
         }
 
         mortalityRecord.necropsyPerformed = necropsyPerformed
@@ -231,7 +244,7 @@ struct RecordDeceasedView: View {
         let cattle = Cattle.create(in: context)
         cattle.tagNumber = "LHF-C001"
         cattle.name = "Sample Cow"
-        cattle.currentStage = CattleStage.breeding.rawValue
+        cattle.currentStage = LegacyCattleStage.breeding.rawValue
         cattle.dateOfBirth = Calendar.current.date(byAdding: .year, value: -5, to: Date())
         return cattle
     }())

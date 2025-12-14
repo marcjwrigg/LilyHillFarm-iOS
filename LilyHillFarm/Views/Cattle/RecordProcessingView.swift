@@ -13,9 +13,15 @@ struct RecordProcessingView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
 
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Processor.name, ascending: true)],
+        predicate: NSPredicate(format: "isActive == YES AND deletedAt == nil"),
+        animation: .default)
+    private var processors: FetchedResults<Processor>
+
     // Processing Details
     @State private var processingDate = Date()
-    @State private var processor = ""
+    @State private var selectedProcessor: Processor?
     @State private var liveWeight = ""
     @State private var hangingWeight = ""
     @State private var processingCost = ""
@@ -62,7 +68,34 @@ struct RecordProcessingView: View {
                 Section("Processing Information") {
                     DatePicker("Processing Date", selection: $processingDate, displayedComponents: [.date])
 
-                    TextField("Processor/Facility", text: $processor)
+                    Picker("Processor", selection: $selectedProcessor) {
+                        Text("Select...").tag(nil as Processor?)
+                        ForEach(processors) { processor in
+                            Text(processor.displayValue).tag(processor as Processor?)
+                        }
+                    }
+
+                    if let processor = selectedProcessor {
+                        if let location = processor.location, !location.isEmpty {
+                            HStack {
+                                Text("Location")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text(location)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if let contact = processor.phone, !contact.isEmpty {
+                            HStack {
+                                Text("Contact")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text(contact)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
                 }
 
                 // Weights
@@ -195,7 +228,10 @@ struct RecordProcessingView: View {
         // Create processing record
         let processingRecord = ProcessingRecord.create(for: cattle, in: viewContext)
         processingRecord.processingDate = processingDate
-        processingRecord.processor = processor.isEmpty ? nil : processor
+
+        // Save processor ID and name
+        processingRecord.processorId = selectedProcessor?.id
+        processingRecord.processor = selectedProcessor?.name
 
         if let liveWeightValue = liveWeightValue {
             processingRecord.liveWeight = NSDecimalNumber(decimal: liveWeightValue)
@@ -217,7 +253,7 @@ struct RecordProcessingView: View {
         processingRecord.notes = notes.isEmpty ? nil : notes
 
         // Update cattle status
-        cattle.currentStage = CattleStage.processed.rawValue
+        cattle.currentStage = LegacyCattleStage.processed.rawValue
         cattle.currentStatus = CattleStatus.processed.rawValue
         cattle.processingDate = processingDate
         cattle.exitDate = processingDate
@@ -241,7 +277,7 @@ struct RecordProcessingView: View {
         let cattle = Cattle.create(in: context)
         cattle.tagNumber = "LHF-F001"
         cattle.name = "Sample Feeder"
-        cattle.currentStage = CattleStage.feeder.rawValue
+        cattle.currentStage = LegacyCattleStage.feeder.rawValue
         return cattle
     }())
     .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)

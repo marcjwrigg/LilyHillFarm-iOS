@@ -10,7 +10,7 @@ internal import CoreData
 
 struct PromoteStageView: View {
     @ObservedObject var cattle: Cattle
-    let toStage: CattleStage
+    let toStage: LegacyCattleStage
 
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
@@ -23,7 +23,7 @@ struct PromoteStageView: View {
 
     var recommendedInfo: StagePromotionInfo? {
         // Get current stage to determine which promotion info to use
-        guard let currentStageEnum = CattleStage(rawValue: cattle.currentStage ?? "") else {
+        guard let currentStageEnum = LegacyCattleStage(rawValue: cattle.currentStage ?? "") else {
             return nil
         }
 
@@ -256,7 +256,7 @@ struct PromoteStageView: View {
             let cattle = Cattle.create(in: context)
             cattle.tagNumber = "LHF-001"
             cattle.name = "Test Calf"
-            cattle.currentStage = CattleStage.calf.rawValue
+            cattle.currentStage = LegacyCattleStage.calf.rawValue
             cattle.dateOfBirth = Calendar.current.date(byAdding: .month, value: -7, to: Date())
             return cattle
         }(),

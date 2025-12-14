@@ -42,7 +42,7 @@ class PhotoStorageService {
 
         // 4. Upload thumbnail
         let thumbFileName = "thumb_\(fileName)"
-        let thumbnailUrl = try await supabase.uploadPhoto(thumbnailData, fileName: thumbFileName)
+        _ = try await supabase.uploadPhoto(thumbnailData, fileName: thumbFileName)
 
         // 5. Create photo record in database
         let photoRecord = PhotoRecord(

@@ -13,15 +13,34 @@ struct EditHealthRecordView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
 
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \HealthRecordType.name, ascending: true)],
+        predicate: NSPredicate(format: "isActive == YES AND deletedAt == nil"),
+        animation: .default)
+    private var healthRecordTypes: FetchedResults<HealthRecordType>
+
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Medication.name, ascending: true)],
+        predicate: NSPredicate(format: "isActive == YES AND deletedAt == nil"),
+        animation: .default)
+    private var medications: FetchedResults<Medication>
+
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Veterinarian.name, ascending: true)],
+        predicate: NSPredicate(format: "isActive == YES AND deletedAt == nil"),
+        animation: .default)
+    private var veterinarians: FetchedResults<Veterinarian>
+
     // Record details
-    @State private var recordType: HealthRecordType = .checkup
+    @State private var selectedRecordType: HealthRecordType?
     @State private var date = Date()
     @State private var condition = ""
     @State private var treatment = ""
-    @State private var medication = ""
+    @State private var selectedMedications: Set<Medication> = []
+    @State private var showMedicationPicker = false
     @State private var dosage = ""
     @State private var administrationMethod: AdministrationMethod?
-    @State private var veterinarian = ""
+    @State private var selectedVeterinarian: Veterinarian?
     @State private var notes = ""
 
     // Measurements
@@ -62,9 +81,10 @@ struct EditHealthRecordView: View {
             Form {
                 // Basic Info
                 Section("Record Information") {
-                    Picker("Type *", selection: $recordType) {
-                        ForEach(HealthRecordType.allCases) { type in
-                            Text(type.rawValue).tag(type)
+                    Picker("Type *", selection: $selectedRecordType) {
+                        Text("Select Type").tag(nil as HealthRecordType?)
+                        ForEach(healthRecordTypes) { type in
+                            Text(type.displayValue).tag(type as HealthRecordType?)
                         }
                     }
 
@@ -121,7 +141,14 @@ struct EditHealthRecordView: View {
                 // Treatment
                 Section("Treatment") {
                     TextField("Treatment", text: $treatment)
-                    TextField("Medication", text: $medication)
+
+                    MultiSelectDisplay(
+                        selectedItems: selectedMedications,
+                        itemLabel: { $0.displayValue },
+                        placeholder: "Select medications",
+                        onTap: { showMedicationPicker = true }
+                    )
+
                     TextField("Dosage", text: $dosage)
 
                     Picker("Administration Method", selection: $administrationMethod) {
@@ -131,7 +158,12 @@ struct EditHealthRecordView: View {
                         }
                     }
 
-                    TextField("Veterinarian", text: $veterinarian)
+                    Picker("Veterinarian", selection: $selectedVeterinarian) {
+                        Text("Select...").tag(nil as Veterinarian?)
+                        ForEach(veterinarians) { vet in
+                            Text(vet.displayValue).tag(vet as Veterinarian?)
+                        }
+                    }
                 }
 
                 // Measurements
@@ -336,24 +368,43 @@ struct EditHealthRecordView: View {
                 }
                 #endif
             }
+            .sheet(isPresented: $showMedicationPicker) {
+                MultiSelectPicker(
+                    title: "Select Medications",
+                    items: Array(medications),
+                    selectedItems: $selectedMedications,
+                    itemLabel: { $0.displayValue }
+                )
+            }
         }
     }
 
     // MARK: - Load Existing Data
 
     private func loadExistingData() {
-        // Load existing record data
-        if let typeString = healthRecord.recordType,
-           let type = HealthRecordType(rawValue: typeString) {
-            recordType = type
+        // Load record type entity by name
+        if let typeName = healthRecord.recordType {
+            selectedRecordType = healthRecordTypes.first(where: { $0.name == typeName })
         }
 
         date = healthRecord.date ?? Date()
         condition = healthRecord.condition ?? ""
         treatment = healthRecord.treatment ?? ""
-        medication = healthRecord.medication ?? ""
+
+        // Load medications from medicationIds array
+        if let medicationIdsArray = healthRecord.medicationIds as? [UUID] {
+            selectedMedications = Set(medications.filter { medication in
+                medicationIdsArray.contains(medication.id ?? UUID())
+            })
+        }
+
         dosage = healthRecord.dosage ?? ""
-        veterinarian = healthRecord.veterinarian ?? ""
+
+        // Load veterinarian entity by ID
+        if let vetId = healthRecord.veterinarianId {
+            selectedVeterinarian = veterinarians.first(where: { $0.id == vetId })
+        }
+
         notes = healthRecord.notes ?? ""
 
         if let method = healthRecord.administrationMethod {
@@ -390,13 +441,30 @@ struct EditHealthRecordView: View {
 
     private func saveRecord() {
         healthRecord.date = date
-        healthRecord.recordType = recordType.rawValue
+
+        // Save record type ID and name from dynamic lookup
+        healthRecord.recordTypeId = selectedRecordType?.id
+        healthRecord.recordType = selectedRecordType?.name ?? "Checkup"
+
         healthRecord.condition = condition.isEmpty ? nil : condition
         healthRecord.treatment = treatment.isEmpty ? nil : treatment
-        healthRecord.medication = medication.isEmpty ? nil : medication
+
+        // Save medications as comma-separated names (for backward compatibility)
+        // and as UUID array (for future use)
+        if !selectedMedications.isEmpty {
+            healthRecord.medication = selectedMedications.map { $0.name ?? "Unknown" }.joined(separator: ", ")
+            healthRecord.medicationIds = selectedMedications.toUUIDArray() as NSArray
+        } else {
+            healthRecord.medication = nil
+            healthRecord.medicationIds = nil
+        }
+
         healthRecord.dosage = dosage.isEmpty ? nil : dosage
         healthRecord.administrationMethod = administrationMethod?.rawValue
-        healthRecord.veterinarian = veterinarian.isEmpty ? nil : veterinarian
+
+        // Save veterinarian ID and name
+        healthRecord.veterinarianId = selectedVeterinarian?.id
+        healthRecord.veterinarian = selectedVeterinarian?.name
         healthRecord.notes = notes.isEmpty ? nil : notes
 
         // Measurements

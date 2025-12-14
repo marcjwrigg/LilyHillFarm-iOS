@@ -76,8 +76,8 @@ extension CalvingRecord {
         calf.breed = breed ?? dam?.breed
         calf.sex = calfSex ?? ""
         calf.dateOfBirth = calvingDate
-        calf.currentStage = CattleStage.calf.rawValue
-        calf.productionPath = ProductionPath.beefFinishing.rawValue
+        calf.currentStage = LegacyCattleStage.calf.rawValue
+        calf.productionPath = LegacyProductionPath.beefFinishing.rawValue
         calf.dam = dam
         calf.sire = sire
 

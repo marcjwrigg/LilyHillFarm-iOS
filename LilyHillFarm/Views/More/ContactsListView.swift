@@ -172,75 +172,25 @@ struct ContactRowView: View {
     let contact: Contact
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(contact.displayName)
-                    .font(.headline)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(contact.displayName)
+                        .font(.headline)
 
-                Spacer()
-
-                // Business/Individual badge
-                if contact.isBusiness {
-                    Image(systemName: "building.2.fill")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                } else {
-                    Image(systemName: "person.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                }
-
-                // Status indicator
-                if !contact.isActive {
-                    Text("Inactive")
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.gray.opacity(0.2))
-                        .foregroundColor(.gray)
-                        .cornerRadius(4)
+                    if let type = contact.contactType, !type.isEmpty {
+                        Text("•")
+                            .foregroundColor(.secondary)
+                        Text(type)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
 
-            if let company = contact.company, !company.isEmpty {
-                if contact.name != nil && contact.name != company {
-                    Text(company)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            HStack(spacing: 16) {
-                if let type = contact.contactType, !type.isEmpty {
-                    Label(type, systemImage: contactTypeIcon(type))
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                }
-
-                // Show primary phone from phone_numbers table or legacy field
-                if let primaryPhone = contact.primaryPhone, let phoneNum = primaryPhone.phoneNumber {
-                    Label(phoneNum, systemImage: "phone.fill")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else if let phone = contact.phone, !phone.isEmpty {
-                    Label(phone, systemImage: "phone.fill")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                // Show primary email from emails table or legacy field
-                if let primaryEmail = contact.primaryEmail, let emailAddr = primaryEmail.email {
-                    Label(emailAddr, systemImage: "envelope.fill")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else if let email = contact.email, !email.isEmpty {
-                    Label(email, systemImage: "envelope.fill")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
+            Spacer()
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
 
     private func contactTypeIcon(_ type: String) -> String {
@@ -480,13 +430,27 @@ struct ContactDetailView: View {
                             if let email = person.email, !email.isEmpty {
                                 Label(email, systemImage: "envelope.fill")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(.blue)
+                                    .onTapGesture {
+                                        if let url = URL(string: "mailto:\(email)") {
+                                            #if os(iOS)
+                                            UIApplication.shared.open(url)
+                                            #endif
+                                        }
+                                    }
                             }
 
                             if let phone = person.phone, !phone.isEmpty {
                                 Label(phone, systemImage: "phone.fill")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(.blue)
+                                    .onTapGesture {
+                                        if let url = URL(string: "tel://\(phone.replacingOccurrences(of: " ", with: ""))") {
+                                            #if os(iOS)
+                                            UIApplication.shared.open(url)
+                                            #endif
+                                        }
+                                    }
                             }
                         }
                         .padding(.vertical, 4)
@@ -632,10 +596,10 @@ struct AddContactView: View {
     @State private var showingAddEmail = false
     @State private var showingAddPerson = false
 
-    let contactTypes = ["Veterinarian", "Supplier", "Buyer", "Processor", "Hauler", "Service Provider", "Other"]
+    let contactTypes = ["Buyer", "Veterinarian", "Supplier", "Feed Store", "Processor", "Hauler", "Breeder", "Insurance", "Accounting", "Legal", "Banking", "Government", "Marketing", "Social Media", "Press", "Real Estate", "Equipment Dealer", "Contractor", "Utility", "Transportation", "Association", "Extension Service", "Lab/Testing", "Auction", "Other"]
     let statusOptions = ["Active", "Inactive"]
-    let phoneTypes = ["Mobile", "Work", "Home", "Fax", "Other"]
-    let emailTypes = ["Work", "Personal", "Other"]
+    let phoneTypes = ["Mobile", "Work", "Home", "Fax"]
+    let emailTypes = ["Work", "Personal"]
     let contactMethods = ["Email", "Phone", "Either"]
 
     init(contact: Contact? = nil) {
@@ -949,7 +913,6 @@ struct AddContactView: View {
 
         // Sync phone numbers
         let existingPhones = (contactToSave.phoneNumbers as? Set<ContactPhoneNumber>) ?? []
-        let existingPhoneIds = Set(existingPhones.compactMap { $0.id })
         let newPhoneIds = Set(phoneNumbers.map { $0.id })
 
         // Remove deleted phones
@@ -975,7 +938,6 @@ struct AddContactView: View {
 
         // Sync emails
         let existingEmails = (contactToSave.emails as? Set<ContactEmail>) ?? []
-        let existingEmailIds = Set(existingEmails.compactMap { $0.id })
         let newEmailIds = Set(emails.map { $0.id })
 
         // Remove deleted emails
@@ -1001,7 +963,6 @@ struct AddContactView: View {
 
         // Sync contact persons
         let existingPersons = (contactToSave.contactPersons as? Set<ContactPerson>) ?? []
-        let existingPersonIds = Set(existingPersons.compactMap { $0.id })
         let newPersonIds = Set(contactPersons.map { $0.id })
 
         // Remove deleted persons
@@ -1046,7 +1007,7 @@ struct AddPhoneNumberSheet: View {
     @State private var type = "Mobile"
     @State private var isPrimary = false
 
-    let phoneTypes = ["Mobile", "Work", "Home", "Fax", "Other"]
+    let phoneTypes = ["Mobile", "Work", "Home", "Fax"]
 
     var body: some View {
         NavigationView {
@@ -1103,7 +1064,7 @@ struct AddEmailSheet: View {
     @State private var type = "Work"
     @State private var isPrimary = false
 
-    let emailTypes = ["Work", "Personal", "Other"]
+    let emailTypes = ["Work", "Personal"]
 
     var body: some View {
         NavigationView {

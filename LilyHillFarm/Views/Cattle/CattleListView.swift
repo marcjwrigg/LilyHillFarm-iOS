@@ -18,7 +18,7 @@ struct CattleListView: View {
     private var allCattle: FetchedResults<Cattle>
 
     @State private var searchText = ""
-    @State private var selectedStage: CattleStage? = nil
+    @State private var selectedStage: LegacyCattleStage? = nil
     @State private var selectedStatus: CattleStatus = .active
     @State private var selectedLocations: Set<String> = []
     @State private var selectedTags: Set<String> = []
@@ -30,6 +30,7 @@ struct CattleListView: View {
     @State private var showingBulkPromote = false
     @State private var showingBulkSale = false
     @State private var showingBulkTag = false
+    @State private var showingBulkLocation = false
     @State private var showingBulkBreeding = false
     @State private var showingBulkPregnancyCheck = false
     @State private var showingBulkCalving = false
@@ -91,9 +92,26 @@ struct CattleListView: View {
         allCattle.filter { selectedCattle.contains($0.objectID) }
     }
 
+    // Check if any filters are active (beyond defaults)
+    var hasActiveFilters: Bool {
+        !searchText.isEmpty ||
+        selectedStage != nil ||
+        selectedStatus != .active ||
+        !selectedLocations.isEmpty ||
+        !selectedTags.isEmpty
+    }
+
+    // Clear all filters to defaults
+    private func clearAllFilters() {
+        searchText = ""
+        selectedStage = nil
+        selectedStatus = .active
+        selectedLocations.removeAll()
+        selectedTags.removeAll()
+    }
+
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
                 // Compact Filters
                 VStack(spacing: 8) {
                     // Search bar
@@ -126,7 +144,7 @@ struct CattleListView: View {
                                 action: { selectedStage = nil }
                             )
 
-                            ForEach(CattleStage.allCases) { stage in
+                            ForEach(LegacyCattleStage.allCases) { stage in
                                 CompactFilterChip(
                                     title: stage.shortName,
                                     isSelected: selectedStage == stage,
@@ -134,6 +152,25 @@ struct CattleListView: View {
                                 )
                             }
                         }
+                    }
+
+                    // Clear filters button (shown when any filters are active)
+                    if hasActiveFilters {
+                        Button(action: clearAllFilters) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.caption)
+                                Text("Clear All Filters")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.red)
+                            .cornerRadius(8)
+                        }
+                        .padding(.top, 4)
                     }
                 }
                 .padding(.horizontal)
@@ -243,6 +280,17 @@ struct CattleListView: View {
                                         Image(systemName: "tag.fill")
                                             .font(.title3)
                                         Text("Tags")
+                                            .font(.caption2)
+                                    }
+                                }
+
+                                Button(action: {
+                                    showingBulkLocation = true
+                                }) {
+                                    VStack(spacing: 4) {
+                                        Image(systemName: "map")
+                                            .font(.title3)
+                                        Text("Location")
                                             .font(.caption2)
                                     }
                                 }
@@ -371,6 +419,9 @@ struct CattleListView: View {
             .sheet(isPresented: $showingBulkCalving) {
                 BulkCalvingView(selectedCattle: selectedCattleArray)
             }
+            .sheet(isPresented: $showingBulkLocation) {
+                BulkUpdateLocationView(selectedCattle: selectedCattleArray)
+            }
             .sheet(isPresented: $showingFilterSheet) {
                 CattleFilterSheet(
                     selectedStatus: $selectedStatus,
@@ -380,7 +431,6 @@ struct CattleListView: View {
                     allTags: allTags
                 )
             }
-        }
     }
 
     // MARK: - Selection Helpers
@@ -405,7 +455,7 @@ struct CattleFilterSheet: View {
     let allTags: [String]
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 // Status Filter
                 Section("Status") {
@@ -515,7 +565,7 @@ struct MacOSCattleListView: View {
     private var allCattle: FetchedResults<Cattle>
 
     @State private var searchText = ""
-    @State private var selectedStage: CattleStage? = nil
+    @State private var selectedStage: LegacyCattleStage? = nil
     @State private var selectedStatus: CattleStatus? = .active
     @State private var showingAddCattle = false
     @State private var selectionMode = false
@@ -524,6 +574,7 @@ struct MacOSCattleListView: View {
     @State private var showingBulkPromote = false
     @State private var showingBulkSale = false
     @State private var showingBulkTag = false
+    @State private var showingBulkLocation = false
     @State private var showingBulkBreeding = false
     @State private var showingBulkPregnancyCheck = false
     @State private var showingBulkCalving = false
@@ -588,7 +639,7 @@ struct MacOSCattleListView: View {
                             action: { selectedStage = nil }
                         )
 
-                        ForEach(CattleStage.allCases) { stage in
+                        ForEach(LegacyCattleStage.allCases) { stage in
                             FilterChip(
                                 title: stage.displayName,
                                 isSelected: selectedStage == stage,

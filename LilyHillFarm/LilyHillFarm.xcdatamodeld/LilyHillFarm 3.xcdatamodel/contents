@@ -1,0 +1,721 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23507" systemVersion="24A335" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="YES" userDefinedModelVersionIdentifier="3">
+
+    <!-- Main Cattle Entity -->
+    <entity name="Cattle" representedClassName="Cattle" syncable="YES" codeGenerationType="class">
+        <!-- Identity -->
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="tagNumber" attributeType="String" defaultValueString=""/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+
+        <!-- Basic Information -->
+        <attribute name="sex" attributeType="String" defaultValueString=""/>
+        <attribute name="cattleType" attributeType="String" defaultValueString="Beef"/>
+        <attribute name="dateOfBirth" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="approximateAge" optional="YES" attributeType="String"/>
+        <attribute name="birthWeight" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="color" optional="YES" attributeType="String"/>
+        <attribute name="markings" optional="YES" attributeType="String"/>
+        <attribute name="registrationNumber" optional="YES" attributeType="String"/>
+
+        <!-- Physical Attributes -->
+        <attribute name="currentWeight" optional="YES" attributeType="Decimal" defaultValueString="0.0"/>
+
+        <!-- Purchase Information -->
+        <attribute name="purchaseDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="purchasePrice" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="purchaseWeight" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="purchasedFrom" optional="YES" attributeType="String"/>
+        <attribute name="purchaseType" optional="YES" attributeType="String"/>
+
+        <!-- Status & Lifecycle -->
+        <attribute name="currentStatus" attributeType="String" defaultValueString="Active"/>
+        <attribute name="currentStage" attributeType="String" defaultValueString="Calf"/>
+        <attribute name="productionPath" attributeType="String" defaultValueString="BeefFinishing"/>
+
+        <!-- Lifecycle Dates -->
+        <attribute name="weaningDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="weaningWeight" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="finishingStartDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="processingDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="estimatedProcessingDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+
+        <!-- Exit Information -->
+        <attribute name="exitReason" optional="YES" attributeType="String"/>
+        <attribute name="exitDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="salePrice" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+
+        <!-- Notes -->
+        <attribute name="notes" optional="YES" attributeType="String"/>
+
+        <!-- Tags -->
+        <attribute name="tags" optional="YES" attributeType="String"/>
+
+        <!-- Location -->
+        <attribute name="pastureId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="location" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromData" customClassName="NSArray"/>
+
+        <!-- NEW: External Sire Information (from Supabase schema) -->
+        <attribute name="externalSireName" optional="YES" attributeType="String"/>
+        <attribute name="externalSireRegistration" optional="YES" attributeType="String"/>
+
+        <!-- NEW: Multi-farm support -->
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+
+        <!-- Metadata -->
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+
+        <!-- Relationships -->
+        <relationship name="breed" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Breed" inverseName="cattle" inverseEntity="Breed"/>
+        <relationship name="dam" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="offspring" inverseEntity="Cattle"/>
+        <relationship name="sire" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="siredOffspring" inverseEntity="Cattle"/>
+        <relationship name="offspring" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Cattle" inverseName="dam" inverseEntity="Cattle"/>
+        <relationship name="siredOffspring" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Cattle" inverseName="sire" inverseEntity="Cattle"/>
+        <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="cattle" inverseEntity="Photo"/>
+        <relationship name="healthRecords" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="HealthRecord" inverseName="cattle" inverseEntity="HealthRecord"/>
+        <relationship name="calvingRecordsAsDam" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="CalvingRecord" inverseName="dam" inverseEntity="CalvingRecord"/>
+        <relationship name="calvingRecordsAsSire" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="CalvingRecord" inverseName="sire" inverseEntity="CalvingRecord"/>
+        <relationship name="calvingRecordAsCalf" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CalvingRecord" inverseName="calf" inverseEntity="CalvingRecord"/>
+        <relationship name="pregnancyRecordsAsCow" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PregnancyRecord" inverseName="cow" inverseEntity="PregnancyRecord"/>
+        <relationship name="pregnancyRecordsAsBull" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PregnancyRecord" inverseName="bull" inverseEntity="PregnancyRecord"/>
+        <relationship name="stageTransitions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="StageTransition" inverseName="cattle" inverseEntity="StageTransition"/>
+        <relationship name="processingRecord" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="ProcessingRecord" inverseName="cattle" inverseEntity="ProcessingRecord"/>
+        <relationship name="saleRecord" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="SaleRecord" inverseName="cattle" inverseEntity="SaleRecord"/>
+        <relationship name="mortalityRecord" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="MortalityRecord" inverseName="cattle" inverseEntity="MortalityRecord"/>
+        <relationship name="tasks" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Task" inverseName="cattle" inverseEntity="Task"/>
+    </entity>
+
+    <!-- Breed Entity -->
+    <entity name="Breed" representedClassName="Breed" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="category" attributeType="String" defaultValueString="Beef"/>
+        <attribute name="characteristics" optional="YES" attributeType="String"/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="cattle" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Cattle" inverseName="breed" inverseEntity="Cattle"/>
+    </entity>
+
+    <!-- Health Record Entity -->
+    <entity name="HealthRecord" representedClassName="HealthRecord" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="recordType" attributeType="String" defaultValueString=""/>
+        <attribute name="recordTypeId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="condition" optional="YES" attributeType="String"/>
+        <attribute name="treatment" optional="YES" attributeType="String"/>
+        <attribute name="medication" optional="YES" attributeType="String"/>
+        <attribute name="medicationIds" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromData" customClassName="NSArray"/>
+        <attribute name="dosage" optional="YES" attributeType="String"/>
+        <attribute name="administrationMethod" optional="YES" attributeType="String"/>
+        <attribute name="veterinarian" optional="YES" attributeType="String"/>
+        <attribute name="veterinarianId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="cost" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="temperature" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="weight" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="followUpDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="followUpCompleted" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="treatmentPlanId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Multi-farm support -->
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="healthRecords" inverseEntity="Cattle"/>
+        <relationship name="treatmentPlan" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="TreatmentPlan" inverseName="healthRecords" inverseEntity="TreatmentPlan"/>
+        <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="healthRecord" inverseEntity="Photo"/>
+        <relationship name="tasks" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Task" inverseName="healthRecord" inverseEntity="Task"/>
+    </entity>
+
+    <!-- Calving Record Entity -->
+    <entity name="CalvingRecord" representedClassName="CalvingRecord" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="calvingDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="difficulty" attributeType="String" defaultValueString=""/>
+        <attribute name="calfSex" attributeType="String" defaultValueString=""/>
+        <attribute name="calfBirthWeight" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="calfVigor" optional="YES" attributeType="String"/>
+        <attribute name="complications" optional="YES" attributeType="String"/>
+        <attribute name="retainedPlacenta" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="assistanceProvided" optional="YES" attributeType="String"/>
+        <attribute name="veterinarianCalled" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="veterinarian" optional="YES" attributeType="String"/>
+        <attribute name="veterinarianId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="pregnancyId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Multi-farm support -->
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <relationship name="dam" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="calvingRecordsAsDam" inverseEntity="Cattle"/>
+        <relationship name="sire" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="calvingRecordsAsSire" inverseEntity="Cattle"/>
+        <relationship name="calf" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="calvingRecordAsCalf" inverseEntity="Cattle"/>
+        <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="calvingRecord" inverseEntity="Photo"/>
+    </entity>
+
+    <!-- Pregnancy Record Entity -->
+    <entity name="PregnancyRecord" representedClassName="PregnancyRecord" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="breedingDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="breedingStartDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="breedingEndDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="breedingMethod" attributeType="String" defaultValueString=""/>
+        <attribute name="aiTechnician" optional="YES" attributeType="String"/>
+        <attribute name="semenSource" optional="YES" attributeType="String"/>
+        <attribute name="externalBullName" optional="YES" attributeType="String"/>
+        <attribute name="externalBullRegistration" optional="YES" attributeType="String"/>
+        <attribute name="confirmedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="confirmationMethod" optional="YES" attributeType="String"/>
+        <attribute name="expectedCalvingDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="expectedCalvingStartDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="expectedCalvingEndDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="status" attributeType="String" defaultValueString="bred"/>
+        <attribute name="outcome" optional="YES" attributeType="String"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Multi-farm support -->
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <relationship name="cow" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="pregnancyRecordsAsCow" inverseEntity="Cattle"/>
+        <relationship name="bull" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="pregnancyRecordsAsBull" inverseEntity="Cattle"/>
+        <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="pregnancyRecord" inverseEntity="Photo"/>
+    </entity>
+
+    <!-- Stage Transition Entity -->
+    <entity name="StageTransition" representedClassName="StageTransition" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="fromStage" optional="YES" attributeType="String"/>
+        <attribute name="toStage" attributeType="String" defaultValueString=""/>
+        <attribute name="transitionDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="weight" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Multi-farm support -->
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="stageTransitions" inverseEntity="Cattle"/>
+    </entity>
+
+    <!-- Processing Record Entity -->
+    <entity name="ProcessingRecord" representedClassName="ProcessingRecord" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="processingDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="processor" optional="YES" attributeType="String"/>
+        <attribute name="processorId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="liveWeight" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="hangingWeight" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="processingCost" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="dressPercentage" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Multi-farm support -->
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="processingRecord" inverseEntity="Cattle"/>
+        <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="processingRecord" inverseEntity="Photo"/>
+    </entity>
+
+    <!-- Sale Record Entity -->
+    <entity name="SaleRecord" representedClassName="SaleRecord" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="saleDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deliveryDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="buyerName" optional="YES" attributeType="String"/>
+        <attribute name="buyerId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="salePrice" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="saleWeight" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="pricePerPound" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Multi-farm support -->
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="saleRecord" inverseEntity="Cattle"/>
+        <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="saleRecord" inverseEntity="Photo"/>
+    </entity>
+
+    <!-- Mortality Record Entity -->
+    <entity name="MortalityRecord" representedClassName="MortalityRecord" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="deathDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="cause" optional="YES" attributeType="String"/>
+        <attribute name="causeCategory" optional="YES" attributeType="String"/>
+        <attribute name="disposalMethod" optional="YES" attributeType="String"/>
+        <attribute name="veterinarian" optional="YES" attributeType="String"/>
+        <attribute name="veterinarianId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="necropsyPerformed" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="necropsyResults" optional="YES" attributeType="String"/>
+        <attribute name="reportedToAuthorities" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Multi-farm support -->
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="mortalityRecord" inverseEntity="Cattle"/>
+        <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="mortalityRecord" inverseEntity="Photo"/>
+    </entity>
+
+    <!-- Photo Entity (Universal) -->
+    <entity name="Photo" representedClassName="Photo" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="caption" optional="YES" attributeType="String"/>
+        <attribute name="dateTaken" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isPrimary" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="thumbnailData" optional="YES" attributeType="Binary" allowsExternalBinaryDataStorage="YES"/>
+        <attribute name="imageAssetPath" optional="YES" attributeType="String"/>
+        <attribute name="fileSize" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Multi-farm support -->
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <!-- Polymorphic relationships - only one should be set -->
+        <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="photos" inverseEntity="Cattle"/>
+        <relationship name="healthRecord" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="HealthRecord" inverseName="photos" inverseEntity="HealthRecord"/>
+        <relationship name="calvingRecord" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CalvingRecord" inverseName="photos" inverseEntity="CalvingRecord"/>
+        <relationship name="pregnancyRecord" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="PregnancyRecord" inverseName="photos" inverseEntity="PregnancyRecord"/>
+        <relationship name="processingRecord" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ProcessingRecord" inverseName="photos" inverseEntity="ProcessingRecord"/>
+        <relationship name="saleRecord" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="SaleRecord" inverseName="photos" inverseEntity="SaleRecord"/>
+        <relationship name="mortalityRecord" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="MortalityRecord" inverseName="photos" inverseEntity="MortalityRecord"/>
+    </entity>
+
+    <!-- Treatment Plan Entity -->
+    <entity name="TreatmentPlan" representedClassName="TreatmentPlan" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="condition" attributeType="String" defaultValueString=""/>
+        <attribute name="planDescription" optional="YES" attributeType="String"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Multi-farm support -->
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="steps" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="TreatmentPlanStep" inverseName="treatmentPlan" inverseEntity="TreatmentPlanStep"/>
+        <relationship name="healthRecords" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="HealthRecord" inverseName="treatmentPlan" inverseEntity="HealthRecord"/>
+    </entity>
+
+    <!-- Treatment Plan Step Entity -->
+    <entity name="TreatmentPlanStep" representedClassName="TreatmentPlanStep" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="stepNumber" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="dayNumber" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="title" attributeType="String" defaultValueString=""/>
+        <attribute name="stepDescription" optional="YES" attributeType="String"/>
+        <attribute name="medication" optional="YES" attributeType="String"/>
+        <attribute name="dosage" optional="YES" attributeType="String"/>
+        <attribute name="administrationMethod" optional="YES" attributeType="String"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="treatmentPlan" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="TreatmentPlan" inverseName="steps" inverseEntity="TreatmentPlan"/>
+    </entity>
+
+    <!-- Task Entity -->
+    <entity name="Task" representedClassName="Task" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="title" attributeType="String" defaultValueString=""/>
+        <attribute name="taskDescription" optional="YES" attributeType="String"/>
+        <attribute name="taskType" attributeType="String" defaultValueString="general"/>
+        <attribute name="priority" attributeType="String" defaultValueString="medium"/>
+        <attribute name="status" attributeType="String" defaultValueString="pending"/>
+        <attribute name="dueDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="assignedToId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="completedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="completedById" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="cattleIds" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromData" customClassName="NSArray"/>
+        <attribute name="pastureIds" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromData" customClassName="NSArray"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Multi-farm support -->
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <!-- NEW: Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <relationship name="cattle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cattle" inverseName="tasks" inverseEntity="Cattle"/>
+        <relationship name="healthRecord" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="HealthRecord" inverseName="tasks" inverseEntity="HealthRecord"/>
+    </entity>
+
+    <!-- Contact Entity -->
+    <entity name="Contact" representedClassName="Contact" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="contactType" attributeType="String" defaultValueString=""/>
+        <attribute name="company" optional="YES" attributeType="String"/>
+        <attribute name="isBusiness" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+
+        <!-- Legacy single fields (deprecated but kept for compatibility) -->
+        <attribute name="email" optional="YES" attributeType="String"/>
+        <attribute name="phone" optional="YES" attributeType="String"/>
+        <attribute name="address" optional="YES" attributeType="String"/>
+
+        <!-- New address fields -->
+        <attribute name="addressLine1" optional="YES" attributeType="String"/>
+        <attribute name="addressLine2" optional="YES" attributeType="String"/>
+        <attribute name="city" optional="YES" attributeType="String"/>
+        <attribute name="state" optional="YES" attributeType="String"/>
+        <attribute name="zipCode" optional="YES" attributeType="String"/>
+        <attribute name="country" optional="YES" attributeType="String"/>
+
+        <!-- Business fields -->
+        <attribute name="website" optional="YES" attributeType="String"/>
+        <attribute name="taxId" optional="YES" attributeType="String"/>
+        <attribute name="paymentTerms" optional="YES" attributeType="String"/>
+
+        <!-- Contact preferences -->
+        <attribute name="status" attributeType="String" defaultValueString="Active"/>
+        <attribute name="preferredContactMethod" optional="YES" attributeType="String"/>
+
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+
+        <!-- Multi-farm support -->
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <!-- Soft delete support -->
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <!-- NEW: Offline sync support -->
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+
+        <!-- Relationships -->
+        <relationship name="phoneNumbers" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ContactPhoneNumber" inverseName="contact" inverseEntity="ContactPhoneNumber"/>
+        <relationship name="emails" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ContactEmail" inverseName="contact" inverseEntity="ContactEmail"/>
+        <relationship name="contactPersons" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ContactPerson" inverseName="businessContact" inverseEntity="ContactPerson"/>
+    </entity>
+
+    <entity name="ContactPhoneNumber" representedClassName="ContactPhoneNumber" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="phoneNumber" attributeType="String" defaultValueString=""/>
+        <attribute name="phoneType" attributeType="String" defaultValueString="Mobile"/>
+        <attribute name="isPrimary" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="contact" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Contact" inverseName="phoneNumbers" inverseEntity="Contact"/>
+    </entity>
+
+    <entity name="ContactEmail" representedClassName="ContactEmail" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="email" attributeType="String" defaultValueString=""/>
+        <attribute name="emailType" attributeType="String" defaultValueString="Work"/>
+        <attribute name="isPrimary" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="contact" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Contact" inverseName="emails" inverseEntity="Contact"/>
+    </entity>
+
+    <entity name="ContactPerson" representedClassName="ContactPerson" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <attribute name="email" optional="YES" attributeType="String"/>
+        <attribute name="phone" optional="YES" attributeType="String"/>
+        <attribute name="isPrimary" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="businessContact" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Contact" inverseName="contactPersons" inverseEntity="Contact"/>
+    </entity>
+
+    <!-- ============================================================================ -->
+    <!-- NEW REFERENCE DATA ENTITIES -->
+    <!-- ============================================================================ -->
+
+    <!-- Cattle Stage Entity -->
+    <entity name="CattleStage" representedClassName="CattleStage" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="displayName" attributeType="String" defaultValueString=""/>
+        <attribute name="stageDescription" optional="YES" attributeType="String"/>
+        <attribute name="color" optional="YES" attributeType="String"/>
+        <attribute name="icon" optional="YES" attributeType="String"/>
+        <attribute name="sortOrder" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="isSystem" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+    </entity>
+
+    <!-- Production Path Entity -->
+    <entity name="ProductionPath" representedClassName="ProductionPath" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="displayName" attributeType="String" defaultValueString=""/>
+        <attribute name="pathDescription" optional="YES" attributeType="String"/>
+        <attribute name="color" optional="YES" attributeType="String"/>
+        <attribute name="icon" optional="YES" attributeType="String"/>
+        <attribute name="isSystem" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <relationship name="stages" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ProductionPathStage" inverseName="productionPath" inverseEntity="ProductionPathStage"/>
+    </entity>
+
+    <!-- Production Path Stage (Junction) Entity -->
+    <entity name="ProductionPathStage" representedClassName="ProductionPathStage" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="productionPathId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="stageId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="stageOrder" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="isOptional" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="minDays" optional="YES" attributeType="Integer 32" usesScalarValueType="YES"/>
+        <attribute name="maxDays" optional="YES" attributeType="Integer 32" usesScalarValueType="YES"/>
+        <attribute name="targetWeightMin" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="targetWeightMax" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <relationship name="productionPath" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ProductionPath" inverseName="stages" inverseEntity="ProductionPath"/>
+    </entity>
+
+    <!-- Health Record Type Entity -->
+    <entity name="HealthRecordType" representedClassName="HealthRecordType" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="typeDescription" optional="YES" attributeType="String"/>
+        <attribute name="icon" optional="YES" attributeType="String"/>
+        <attribute name="color" optional="YES" attributeType="String"/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+    </entity>
+
+    <!-- Medication Entity -->
+    <entity name="Medication" representedClassName="Medication" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="userId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="medicationType" optional="YES" attributeType="String"/>
+        <attribute name="manufacturer" optional="YES" attributeType="String"/>
+        <attribute name="commonDosage" optional="YES" attributeType="String"/>
+        <attribute name="withdrawalPeriod" optional="YES" attributeType="String"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+    </entity>
+
+    <!-- Veterinarian Entity -->
+    <entity name="Veterinarian" representedClassName="Veterinarian" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="clinicName" optional="YES" attributeType="String"/>
+        <attribute name="phone" optional="YES" attributeType="String"/>
+        <attribute name="email" optional="YES" attributeType="String"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+    </entity>
+
+    <!-- Processor Entity -->
+    <entity name="Processor" representedClassName="Processor" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="userId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="location" optional="YES" attributeType="String"/>
+        <attribute name="phone" optional="YES" attributeType="String"/>
+        <attribute name="email" optional="YES" attributeType="String"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="modifiedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+    </entity>
+
+    <!-- Buyer Entity -->
+    <entity name="Buyer" representedClassName="Buyer" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="buyerType" optional="YES" attributeType="String"/>
+        <attribute name="contactName" optional="YES" attributeType="String"/>
+        <attribute name="phone" optional="YES" attributeType="String"/>
+        <attribute name="email" optional="YES" attributeType="String"/>
+        <attribute name="address" optional="YES" attributeType="String"/>
+        <attribute name="city" optional="YES" attributeType="String"/>
+        <attribute name="state" optional="YES" attributeType="String"/>
+        <attribute name="zipCode" optional="YES" attributeType="String"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+    </entity>
+
+    <!-- Pasture Entity -->
+    <entity name="Pasture" representedClassName="Pasture" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="userId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String" defaultValueString=""/>
+        <attribute name="pastureType" attributeType="String" defaultValueString=""/>
+        <attribute name="acreage" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="fencingType" optional="YES" attributeType="String"/>
+        <attribute name="waterSource" optional="YES" attributeType="String"/>
+        <attribute name="carryingCapacity" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="currentOccupancy" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="pastureCondition" attributeType="String" defaultValueString=""/>
+        <attribute name="lastGrazedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="restPeriodDays" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="forageType" optional="YES" attributeType="String"/>
+        <attribute name="forageAcres" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="boundaryCoordinates" optional="YES" attributeType="String"/>
+        <attribute name="forageBoundaryCoordinates" optional="YES" attributeType="String"/>
+        <attribute name="centerLat" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="centerLng" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="mapZoomLevel" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+        <relationship name="logs" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PastureLog" inverseName="pasture" inverseEntity="PastureLog"/>
+    </entity>
+
+    <!-- Pasture Log Entity -->
+    <entity name="PastureLog" representedClassName="PastureLog" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="userId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="farmId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="pastureId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="logType" attributeType="String" defaultValueString="general"/>
+        <attribute name="logDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="title" attributeType="String" defaultValueString=""/>
+        <attribute name="logDescription" optional="YES" attributeType="String"/>
+
+        <!-- Soil Test fields -->
+        <attribute name="soilPH" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="nitrogenLevel" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="phosphorusLevel" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="potassiumLevel" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="testResults" optional="YES" attributeType="String"/>
+        <attribute name="recommendations" optional="YES" attributeType="String"/>
+
+        <!-- Maintenance fields -->
+        <attribute name="maintenanceType" optional="YES" attributeType="String"/>
+        <attribute name="materialsUsed" optional="YES" attributeType="String"/>
+        <attribute name="cost" optional="YES" attributeType="Decimal" defaultValueString="0"/>
+        <attribute name="laborHours" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="status" optional="YES" attributeType="String"/>
+        <attribute name="completedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+
+        <!-- Grazing fields -->
+        <attribute name="animalsMovedIn" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="animalsMovedOut" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="stockingDensity" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+
+        <!-- Hay Cutting fields -->
+        <attribute name="hayCut" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="cuttingDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="bailingDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="yieldPerAcre" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="totalYield" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="moistureContent" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="baleCount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="baleWeight" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="qualityGrade" optional="YES" attributeType="String"/>
+
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="deletedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String" defaultValueString="synced"/>
+
+        <relationship name="pasture" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Pasture" inverseName="logs" inverseEntity="Pasture"/>
+    </entity>
+
+    <!-- Elements (Positioning for Xcode visual editor) -->
+    <elements>
+        <element name="Cattle" positionX="0" positionY="0" width="128" height="524"/>
+        <element name="Breed" positionX="180" positionY="0" width="128" height="134"/>
+        <element name="HealthRecord" positionX="-180" positionY="200" width="128" height="329"/>
+        <element name="CalvingRecord" positionX="180" positionY="200" width="128" height="284"/>
+        <element name="PregnancyRecord" positionX="180" positionY="500" width="128" height="284"/>
+        <element name="StageTransition" positionX="-180" positionY="0" width="128" height="179"/>
+        <element name="ProcessingRecord" positionX="360" positionY="200" width="128" height="209"/>
+        <element name="SaleRecord" positionX="360" positionY="400" width="128" height="239"/>
+        <element name="MortalityRecord" positionX="360" positionY="650" width="128" height="239"/>
+        <element name="Photo" positionX="0" positionY="550" width="128" height="239"/>
+        <element name="TreatmentPlan" positionX="-360" positionY="200" width="128" height="179"/>
+        <element name="TreatmentPlanStep" positionX="-360" positionY="400" width="128" height="224"/>
+        <element name="Task" positionX="-540" positionY="200" width="128" height="284"/>
+        <element name="Contact" positionX="-540" positionY="500" width="128" height="449"/>
+        <element name="ContactPhoneNumber" positionX="-720" positionY="500" width="128" height="179"/>
+        <element name="ContactEmail" positionX="-720" positionY="700" width="128" height="179"/>
+        <element name="ContactPerson" positionX="-720" positionY="900" width="128" height="209"/>
+        <element name="CattleStage" positionX="540" positionY="0" width="128" height="284"/>
+        <element name="ProductionPath" positionX="540" positionY="300" width="128" height="284"/>
+        <element name="ProductionPathStage" positionX="720" positionY="300" width="128" height="284"/>
+        <element name="HealthRecordType" positionX="540" positionY="600" width="128" height="209"/>
+        <element name="Medication" positionX="-900" positionY="200" width="128" height="284"/>
+        <element name="Veterinarian" positionX="-900" positionY="500" width="128" height="209"/>
+        <element name="Processor" positionX="-900" positionY="750" width="128" height="284"/>
+        <element name="Buyer" positionX="720" positionY="0" width="128" height="284"/>
+        <element name="Pasture" positionX="720" positionY="600" width="128" height="449"/>
+        <element name="PastureLog" positionX="900" positionY="600" width="128" height="584"/>
+    </elements>
+</model>

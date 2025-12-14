@@ -9,7 +9,6 @@ import Foundation
 import Combine
 import Supabase
 internal import CoreData
-import AVFoundation
 
 /// Singleton Supabase client wrapper for the application
 @MainActor
@@ -20,7 +19,7 @@ class SupabaseManager: ObservableObject {
 
     // MARK: - Properties
 
-    /// Supabase client instance
+    /// Supabase client instance (implicitly unwrapped - only nil if Supabase not configured)
     private(set) var client: SupabaseClient!
 
     /// Current authenticated user
@@ -35,11 +34,16 @@ class SupabaseManager: ObservableObject {
     /// Network monitor for connectivity
     private let networkMonitor = NetworkMonitor.shared
 
-    /// Sync queue manager for offline support
-    private let syncQueueManager = SyncQueueManager.shared
+    /// Sync queue manager for offline support (lazy to avoid circular dependency)
+    private lazy var syncQueueManager = SyncQueueManager.shared
 
-    /// UserDefaults key for tracking if photo backup has been done
-    private let photoBackupCompletedKey = "PhotoBackupCompleted"
+    /// Cached farm ID for the current user
+    private var _cachedFarmId: UUID?
+
+    /// Get the farm ID for the current authenticated user
+    var selectedFarmId: String? {
+        return _cachedFarmId?.uuidString
+    }
 
     // MARK: - Initialization
 
@@ -65,6 +69,22 @@ class SupabaseManager: ObservableObject {
             return
         }
 
+        // Validate URL before proceeding
+        guard let supabaseURL = URL(string: SupabaseConfig.supabaseURL) else {
+            print("❌ Invalid Supabase URL: '\(SupabaseConfig.supabaseURL)'")
+            print("📱 Running in local-only mode (no cloud sync)")
+            authState = .authenticated
+            return
+        }
+
+        // Validate anon key
+        guard !SupabaseConfig.supabaseAnonKey.isEmpty else {
+            print("❌ Invalid Supabase anon key (empty)")
+            print("📱 Running in local-only mode (no cloud sync)")
+            authState = .authenticated
+            return
+        }
+
         // Initialize Supabase client with custom URLSession for longer timeouts
         let sessionConfig = URLSessionConfiguration.default
         sessionConfig.timeoutIntervalForRequest = 30  // 30 seconds for requests
@@ -73,7 +93,7 @@ class SupabaseManager: ObservableObject {
 
         // Initialize Supabase client
         self.client = SupabaseClient(
-            supabaseURL: URL(string: SupabaseConfig.supabaseURL)!,
+            supabaseURL: supabaseURL,
             supabaseKey: SupabaseConfig.supabaseAnonKey,
             options: SupabaseClientOptions(
                 auth: .init(
@@ -185,12 +205,12 @@ class SupabaseManager: ObservableObject {
 
         // Start realtime subscriptions immediately (non-blocking)
         // User will see live updates while initial sync is in progress
-        let realtimeTask = Task {
+        let realtimeTask = _Concurrency.Task {
             await startRealtimeSubscriptions()
         }
 
         // Perform full sync in parallel (non-blocking)
-        let syncTask = Task {
+        let syncTask = _Concurrency.Task {
             let syncManager = SyncManager(context: context)
             await syncManager.performFullSync()
             print("✅ Initial sync completed successfully")
@@ -198,11 +218,8 @@ class SupabaseManager: ObservableObject {
 
         // Both tasks run in parallel - realtime starts immediately
         // while sync happens in the background
-        await realtimeTask.value
-        await syncTask.value
-
-        // DISABLED: Backup service temporarily disabled
-        // await requestPermissionsAndBackupPhotos()
+        _ = await realtimeTask.value
+        _ = await syncTask.value
     }
 
     /// Start realtime subscriptions for live updates
@@ -224,9 +241,6 @@ class SupabaseManager: ObservableObject {
     func syncOnAppForeground() async {
         print("🔄 Syncing on app foreground...")
 
-        // Get the persistence controller's context
-        let context = PersistenceController.shared.container.viewContext
-
         // Process sync queue first (push local changes that were made offline)
         if networkMonitor.isConnected {
             print("🔄 Processing offline sync queue...")
@@ -234,73 +248,18 @@ class SupabaseManager: ObservableObject {
             print("✅ Sync queue processed")
         }
 
-        // Then pull latest data from server
+        // Then pull latest data from server on background thread
         // Always perform incremental sync to catch changes that happened while app was closed
         // Incremental sync is fast since it only fetches records modified since last sync
         // First sync will automatically be a full sync (when lastSync == nil)
-        let syncManager = SyncManager(context: context)
+
+        // Use a background context to avoid blocking the UI
+        let backgroundContext = PersistenceController.shared.container.newBackgroundContext()
+        backgroundContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+
+        let syncManager = SyncManager(context: backgroundContext)
         await syncManager.performFullSync()
         print("✅ Foreground sync completed successfully")
-
-        // DISABLED: Backup service temporarily disabled
-        // await runPhotoBackup()
-    }
-
-    /// Run photo backup (for subsequent app opens)
-    private func runPhotoBackup() async {
-        let backupService = BackupService()
-
-        // Check if we have access
-        let hasAccess = backupService.hasPhotoLibraryAccess
-        guard hasAccess else {
-            return
-        }
-
-        // Run backup (will sync photos since last sync)
-        await backupService.backupPhotoLibrary()
-    }
-
-    /// Request camera and photo library permissions, then trigger backup (only once ever)
-    private func requestPermissionsAndBackupPhotos() async {
-        // Check if backup has already been completed
-        guard !UserDefaults.standard.bool(forKey: photoBackupCompletedKey) else {
-            return
-        }
-
-        // Request camera permission
-        await requestCameraPermission()
-
-        // Request photo library permission
-        let backupService = BackupService()
-        let hasAccess = backupService.hasPhotoLibraryAccess
-        if !hasAccess {
-            let granted = await backupService.requestPhotoLibraryAccess()
-            guard granted else {
-                return
-            }
-        }
-
-        // Start backup in background
-        await backupService.backupPhotoLibrary()
-
-        // Mark backup as completed
-        UserDefaults.standard.set(true, forKey: photoBackupCompletedKey)
-    }
-
-    /// Request camera permission
-    private func requestCameraPermission() async {
-        let status = AVCaptureDevice.authorizationStatus(for: .video)
-
-        switch status {
-        case .authorized:
-            break
-        case .notDetermined:
-            _ = await AVCaptureDevice.requestAccess(for: .video)
-        case .denied, .restricted:
-            break
-        @unknown default:
-            break
-        }
     }
 
     // MARK: - Auth Methods
@@ -369,6 +328,45 @@ class SupabaseManager: ObservableObject {
     /// Check if user is authenticated
     var isAuthenticated: Bool {
         return authState == .authenticated && currentUser != nil
+    }
+
+    /// Fetch the farm ID for the current authenticated user
+    func fetchFarmId() async throws -> UUID {
+        // Return cached value if available
+        if let cached = _cachedFarmId {
+            return cached
+        }
+
+        guard let client = client else {
+            throw NSError(domain: "SupabaseManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Supabase client not initialized"])
+        }
+
+        guard let userId = userId else {
+            throw NSError(domain: "SupabaseManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+
+        // Fetch from farm_users table
+        struct FarmUser: Decodable {
+            let farm_id: UUID
+        }
+
+        let response: [FarmUser] = try await client
+            .from("farm_users")
+            .select("farm_id")
+            .eq("user_id", value: userId.uuidString)
+            .limit(1)
+            .execute()
+            .value
+
+        guard let farmId = response.first?.farm_id else {
+            throw NSError(domain: "SupabaseManager", code: 3, userInfo: [NSLocalizedDescriptionKey: "No farm found for user"])
+        }
+
+        // Cache it
+        _cachedFarmId = farmId
+        print("✅ Fetched farm_id: \(farmId)")
+
+        return farmId
     }
 }
 

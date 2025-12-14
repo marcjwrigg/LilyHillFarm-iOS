@@ -76,7 +76,11 @@ class BaseSyncManager {
             let farm_id: UUID
         }
 
-        let farmUsers: [FarmUser] = try await supabase.client
+        guard let client = supabase.client else {
+            throw RepositoryError.syncFailed("Supabase client not initialized")
+        }
+
+        let farmUsers: [FarmUser] = try await client
             .from("farm_users")
             .select("farm_id")
             .eq("user_id", value: userId.uuidString)
@@ -121,6 +125,12 @@ class BaseSyncManager {
         UserDefaults.standard.set(date, forKey: key)
     }
 
+    /// Clear last sync date for a table (force full sync on next attempt)
+    func clearLastSyncDate(for tableName: String) {
+        let key = lastSyncKey(for: tableName)
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+
     /// Sync with deletion support - the new recommended sync method
     /// This method handles:
     /// 1. Fetching active records from Supabase
@@ -145,9 +155,13 @@ class BaseSyncManager {
         print("   Last sync: \(lastSync)")
         print("   Farm ID: \(farmId)")
 
-        // 1. Fetch all ACTIVE records from Supabase
-        print("   📥 Fetching active records...")
-        var activeQuery = supabase.client
+        guard let client = supabase.client else {
+            throw RepositoryError.syncFailed("Supabase client not initialized")
+        }
+
+        // 1. Fetch CHANGED/NEW records from Supabase (modified since last sync)
+        print("   📥 Fetching records modified since \(lastSync)...")
+        var activeQuery = client
             .from(tableName)
             .select()
 
@@ -160,19 +174,22 @@ class BaseSyncManager {
             activeQuery = activeQuery.is("deleted_at", value: nil)
         }
 
+        // INCREMENTAL SYNC: Only fetch records modified since last sync
+        activeQuery = activeQuery.gte("updated_at", value: lastSync.ISO8601Format())
+
         let activeRecordsData = try await activeQuery
             .execute()
             .data
 
         let decoder = JSONDecoder()
         let activeRecords = try decoder.decode([AnyCodable].self, from: activeRecordsData)
-        print("   ✅ Fetched \(activeRecords.count) active records")
+        print("   ✅ Fetched \(activeRecords.count) modified/new records")
 
         // 2. Fetch records deleted since last sync (only if table supports deletes)
         var deletedRecords: [DeletedRecord] = []
         if supportsDeletes {
             print("   📥 Fetching deleted records since last sync...")
-            var deletedQuery = supabase.client
+            var deletedQuery = client
                 .from(tableName)
                 .select("id, deleted_at")
 
@@ -229,16 +246,23 @@ class BaseSyncManager {
             }
 
             // 6. Handle orphaned records (exist locally but not in server's active set)
-            let serverIdSet = Set(activeRecords.map { extractId($0.value) })
-            let deletedIdSet = Set(deletedRecords.map { $0.id })
-            let orphanedIds = localIdSet.subtracting(serverIdSet).subtracting(deletedIdSet)
+            // Only do orphan detection if we fetched ALL records (not incremental sync)
+            let isIncrementalSync = lastSync > Date.distantPast
 
-            if !orphanedIds.isEmpty {
-                print("   ⚠️ Found \(orphanedIds.count) orphaned records")
-                print("   🗑️ Hard deleting orphaned records (not found on server)...")
-                for orphanedId in orphanedIds {
-                    try self.hardDelete(id: orphanedId, entityType: entityType)
+            if !isIncrementalSync {
+                let serverIdSet = Set(activeRecords.map { extractId($0.value) })
+                let deletedIdSet = Set(deletedRecords.map { $0.id })
+                let orphanedIds = localIdSet.subtracting(serverIdSet).subtracting(deletedIdSet)
+
+                if !orphanedIds.isEmpty {
+                    print("   ⚠️ Found \(orphanedIds.count) orphaned records")
+                    print("   🗑️ Hard deleting orphaned records (not found on server)...")
+                    for orphanedId in orphanedIds {
+                        try self.hardDelete(id: orphanedId, entityType: entityType)
+                    }
                 }
+            } else {
+                print("   ℹ️ Skipping orphan detection (incremental sync)")
             }
 
             // 7. Save context
@@ -278,9 +302,13 @@ class BaseSyncManager {
 
 // MARK: - Helper Types
 
-/// Helper for decoding any JSON value
+/// Helper for decoding and encoding any JSON value
 struct AnyCodable: Codable {
     let value: Any
+
+    init(_ value: Any) {
+        self.value = value
+    }
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -305,8 +333,32 @@ struct AnyCodable: Codable {
     }
 
     func encode(to encoder: Encoder) throws {
-        // Not needed for our use case
-        fatalError("encode not implemented")
+        var container = encoder.singleValueContainer()
+
+        switch value {
+        case is NSNull:
+            try container.encodeNil()
+        case let bool as Bool:
+            try container.encode(bool)
+        case let int as Int:
+            try container.encode(int)
+        case let double as Double:
+            try container.encode(double)
+        case let string as String:
+            try container.encode(string)
+        case let array as [Any]:
+            try container.encode(array.map { AnyCodable($0) })
+        case let dictionary as [String: Any]:
+            try container.encode(dictionary.mapValues { AnyCodable($0) })
+        default:
+            throw EncodingError.invalidValue(
+                value,
+                EncodingError.Context(
+                    codingPath: container.codingPath,
+                    debugDescription: "Unable to encode value"
+                )
+            )
+        }
     }
 }
 

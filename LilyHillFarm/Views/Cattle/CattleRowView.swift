@@ -122,7 +122,7 @@ struct StageBadge: View {
     let stage: String
 
     var badgeColor: Color {
-        guard let cattleStage = CattleStage(rawValue: stage) else {
+        guard let cattleStage = LegacyCattleStage(rawValue: stage) else {
             return .gray
         }
 
@@ -165,7 +165,7 @@ struct StageBadge: View {
             cattle.name = "Bessie"
             cattle.sex = CattleSex.cow.rawValue
             cattle.color = "Black"
-            cattle.currentStage = CattleStage.weanling.rawValue
+            cattle.currentStage = LegacyCattleStage.weanling.rawValue
             cattle.dateOfBirth = Calendar.current.date(byAdding: .month, value: -8, to: Date())
             return cattle
         }())

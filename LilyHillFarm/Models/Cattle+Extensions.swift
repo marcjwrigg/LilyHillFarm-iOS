@@ -129,13 +129,13 @@ extension Cattle {
         return nextStage() != nil
     }
 
-    func nextStage() -> CattleStage? {
-        guard let currentStageEnum = CattleStage(rawValue: currentStage ?? "") else {
+    func nextStage() -> LegacyCattleStage? {
+        guard let currentStageEnum = LegacyCattleStage(rawValue: currentStage ?? "") else {
             return nil
         }
 
         // Context-aware stage progression based on production path
-        let path = productionPath ?? ProductionPath.beefFinishing.rawValue
+        let path = productionPath ?? LegacyProductionPath.beefFinishing.rawValue
 
         switch currentStageEnum {
         case .calf:
@@ -143,7 +143,7 @@ extension Cattle {
 
         case .weanling:
             // Check production path
-            if path == ProductionPath.breeding.rawValue {
+            if path == LegacyProductionPath.breeding.rawValue {
                 return .breeding
             } else {
                 return .stocker
@@ -151,7 +151,7 @@ extension Cattle {
 
         case .stocker:
             // Check production path
-            if path == ProductionPath.breeding.rawValue {
+            if path == LegacyProductionPath.breeding.rawValue {
                 return .breeding
             } else {
                 return .feeder
@@ -170,7 +170,7 @@ extension Cattle {
         }
     }
 
-    func promoteToStage(_ newStage: CattleStage, weight: Decimal?, notes: String?, context: NSManagedObjectContext) {
+    func promoteToStage(_ newStage: LegacyCattleStage, weight: Decimal?, notes: String?, context: NSManagedObjectContext) {
         let oldStage = currentStage
 
         // Create transition record
@@ -227,7 +227,7 @@ extension Cattle {
         let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
         return sortedHealthRecords.filter {
             guard let date = $0.date else { return false }
-            return date >= thirtyDaysAgo && $0.recordType == HealthRecordType.illness.rawValue
+            return date >= thirtyDaysAgo && $0.recordType == LegacyHealthRecordType.illness.rawValue
         }
     }
 
@@ -288,12 +288,15 @@ extension Cattle {
 
     var locationArray: [String] {
         get {
-            // location is already [String]? in Core Data (Transformable with customClassName)
-            return location ?? []
+            // Convert NSArray to [String]
+            if let nsArray = location as? [String] {
+                return nsArray
+            }
+            return []
         }
         set {
-            // Store directly as [String]?
-            location = newValue.isEmpty ? nil : newValue
+            // Convert [String] to NSArray
+            location = newValue.isEmpty ? nil : (newValue as NSArray)
             modifiedAt = Date()
         }
     }
@@ -347,8 +350,8 @@ extension Cattle {
         let cattle = Cattle(context: context)
         cattle.id = UUID()
         cattle.currentStatus = CattleStatus.active.rawValue
-        cattle.currentStage = CattleStage.calf.rawValue
-        cattle.productionPath = ProductionPath.beefFinishing.rawValue
+        cattle.currentStage = LegacyCattleStage.calf.rawValue
+        cattle.productionPath = LegacyProductionPath.beefFinishing.rawValue
         cattle.createdAt = Date()
         cattle.modifiedAt = Date()
         return cattle

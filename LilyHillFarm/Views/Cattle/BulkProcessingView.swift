@@ -325,7 +325,7 @@ struct BulkProcessingView: View {
             }
 
             // Update cattle
-            cattle.currentStage = CattleStage.processed.rawValue
+            cattle.currentStage = LegacyCattleStage.processed.rawValue
             cattle.currentStatus = CattleStatus.processed.rawValue
             cattle.processingDate = processingDate
             cattle.exitDate = processingDate
@@ -354,7 +354,7 @@ struct BulkProcessingView: View {
             let animal = Cattle.create(in: context)
             animal.tagNumber = "LHF-F\(String(format: "%03d", i))"
             animal.name = "Feeder \(i)"
-            animal.currentStage = CattleStage.feeder.rawValue
+            animal.currentStage = LegacyCattleStage.feeder.rawValue
             animal.currentWeight = NSDecimalNumber(decimal: Decimal(1100 + (i * 50)))
             cattle.append(animal)
         }

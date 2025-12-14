@@ -24,6 +24,17 @@ class SyncManager: ObservableObject {
     private let treatmentPlanRepository: TreatmentPlanRepository
     private let treatmentPlanStepRepository: TreatmentPlanStepRepository
     private let contactRepository: ContactRepository
+
+    // Dynamic lookup repositories
+    private let cattleStageRepository: CattleStageRepository
+    private let productionPathRepository: ProductionPathRepository
+    private let healthRecordTypeRepository: HealthRecordTypeRepository
+    private let medicationRepository: MedicationRepository
+    private let veterinarianRepository: VeterinarianRepository
+    private let processorRepository: ProcessorRepository
+    private let buyerRepository: BuyerRepository
+    private let pastureRepository: PastureRepository
+
     private let cattleRepository: CattleRepository
     private let healthRecordRepository: HealthRecordRepository
     private let pregnancyRecordRepository: PregnancyRecordRepository
@@ -34,6 +45,7 @@ class SyncManager: ObservableObject {
     private let stageTransitionRepository: StageTransitionRepository
     private let photoRepository: PhotoRepository
     private let taskRepository: TaskRepository
+    private let pastureLogRepository: PastureLogRepository
     private let context: NSManagedObjectContext
 
     // MARK: - Initialization
@@ -44,6 +56,17 @@ class SyncManager: ObservableObject {
         self.treatmentPlanRepository = TreatmentPlanRepository(context: context)
         self.treatmentPlanStepRepository = TreatmentPlanStepRepository(context: context)
         self.contactRepository = ContactRepository(context: context)
+
+        // Initialize dynamic lookup repositories
+        self.cattleStageRepository = CattleStageRepository(context: context)
+        self.productionPathRepository = ProductionPathRepository(context: context)
+        self.healthRecordTypeRepository = HealthRecordTypeRepository(context: context)
+        self.medicationRepository = MedicationRepository(context: context)
+        self.veterinarianRepository = VeterinarianRepository(context: context)
+        self.processorRepository = ProcessorRepository(context: context)
+        self.buyerRepository = BuyerRepository(context: context)
+        self.pastureRepository = PastureRepository(context: context)
+
         self.cattleRepository = CattleRepository(context: context)
         self.healthRecordRepository = HealthRecordRepository(context: context)
         self.pregnancyRecordRepository = PregnancyRecordRepository(context: context)
@@ -54,6 +77,7 @@ class SyncManager: ObservableObject {
         self.stageTransitionRepository = StageTransitionRepository(context: context)
         self.photoRepository = PhotoRepository(context: context)
         self.taskRepository = TaskRepository(context: context)
+        self.pastureLogRepository = PastureLogRepository(context: context)
     }
 
     // MARK: - Full Sync
@@ -111,6 +135,79 @@ class SyncManager: ObservableObject {
             syncErrors["contacts"] = error
         }
         syncProgress = 0.10
+
+        // Sync dynamic lookup tables (10-20%)
+        print("📊 Syncing cattle stages...")
+        do {
+            try await cattleStageRepository.syncFromSupabase()
+        } catch {
+            print("❌ Cattle stages sync failed: \(error)")
+            syncErrors["cattle_stages"] = error
+        }
+        syncProgress = 0.11
+
+        print("📊 Syncing production paths...")
+        do {
+            try await productionPathRepository.syncFromSupabase()
+        } catch {
+            print("❌ Production paths sync failed: \(error)")
+            syncErrors["production_paths"] = error
+        }
+        syncProgress = 0.12
+
+        print("📊 Syncing health record types...")
+        do {
+            try await healthRecordTypeRepository.syncFromSupabase()
+        } catch {
+            print("❌ Health record types sync failed: \(error)")
+            syncErrors["health_record_types"] = error
+        }
+        syncProgress = 0.14
+
+        print("📊 Syncing medications...")
+        do {
+            try await medicationRepository.syncFromSupabase()
+        } catch {
+            print("❌ Medications sync failed: \(error)")
+            syncErrors["medications"] = error
+        }
+        syncProgress = 0.15
+
+        print("📊 Syncing veterinarians...")
+        do {
+            try await veterinarianRepository.syncFromSupabase()
+        } catch {
+            print("❌ Veterinarians sync failed: \(error)")
+            syncErrors["veterinarians"] = error
+        }
+        syncProgress = 0.16
+
+        print("📊 Syncing processors...")
+        do {
+            try await processorRepository.syncFromSupabase()
+        } catch {
+            print("❌ Processors sync failed: \(error)")
+            syncErrors["processors"] = error
+        }
+        syncProgress = 0.17
+
+        print("📊 Syncing buyers...")
+        do {
+            try await buyerRepository.syncFromSupabase()
+        } catch {
+            print("❌ Buyers sync failed: \(error)")
+            syncErrors["buyers"] = error
+        }
+        syncProgress = 0.18
+
+        print("📊 Syncing pastures...")
+        do {
+            try await pastureRepository.syncFromSupabase()
+        } catch {
+            print("❌ Pastures sync failed: \(error)")
+            syncErrors["pastures"] = error
+        }
+        syncProgress = 0.20
 
         // 2. Sync cattle (30%) - must happen before related records
         print("📊 Syncing cattle...")
@@ -202,9 +299,25 @@ class SyncManager: ObservableObject {
         }
         syncProgress = 0.90
 
-        // 11. Sync tasks (95%)
-        // TODO: Implement task sync
-        syncProgress = 0.95
+        // 11. Sync tasks (93%)
+        print("📊 Syncing tasks...")
+        do {
+            try await taskRepository.syncFromSupabase()
+        } catch {
+            print("❌ Tasks sync failed: \(error)")
+            syncErrors["tasks"] = error
+        }
+        syncProgress = 0.93
+
+        // 12. Sync pasture logs (96%)
+        print("📊 Syncing pasture logs...")
+        do {
+            try await pastureLogRepository.syncFromSupabase()
+        } catch {
+            print("❌ Pasture logs sync failed: \(error)")
+            syncErrors["pasture_logs"] = error
+        }
+        syncProgress = 0.96
 
         // Complete (100%)
         syncProgress = 1.0
@@ -269,6 +382,12 @@ class SyncManager: ObservableObject {
             let photoFetch: NSFetchRequest<Photo> = Photo.fetchRequest()
             let photoCount = (try? self.context.count(for: photoFetch)) ?? 0
 
+            let taskFetch: NSFetchRequest<Task> = Task.fetchRequest()
+            let taskCount = (try? self.context.count(for: taskFetch)) ?? 0
+
+            let pastureLogFetch: NSFetchRequest<PastureLog> = PastureLog.fetchRequest()
+            let pastureLogCount = (try? self.context.count(for: pastureLogFetch)) ?? 0
+
             print("📊 Sync Summary:")
             print("   - Breeds: \(breedCount)")
             print("   - Treatment Plans: \(treatmentPlanCount)")
@@ -283,6 +402,8 @@ class SyncManager: ObservableObject {
             print("   - Mortality Records: \(mortalityCount)")
             print("   - Stage Transitions: \(stageTransitionCount)")
             print("   - Photos: \(photoCount)")
+            print("   - Tasks: \(taskCount)")
+            print("   - Pasture Logs: \(pastureLogCount)")
         }
     }
 

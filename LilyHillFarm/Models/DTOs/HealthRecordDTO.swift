@@ -10,7 +10,7 @@ import Foundation
 /// DTO for syncing health record data with Supabase
 struct HealthRecordDTO: Codable {
     let id: UUID
-    let cattleId: UUID
+    let cattleId: UUID?
     let farmId: UUID?
     let recordDate: String?
     let recordType: String?
@@ -58,7 +58,7 @@ extension HealthRecordDTO {
     /// Create DTO from Core Data HealthRecord entity
     init(from record: HealthRecord) {
         self.id = record.id ?? UUID()
-        self.cattleId = record.cattle?.id ?? UUID()
+        self.cattleId = record.cattle?.id
         self.farmId = record.farmId
         self.recordDate = record.date?.toISO8601String()
         self.recordType = record.recordType ?? ""

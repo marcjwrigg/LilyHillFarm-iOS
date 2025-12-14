@@ -14,6 +14,7 @@ enum CattleSex: String, CaseIterable, Identifiable {
     case cow = "Cow"
     case steer = "Steer"
     case heifer = "Heifer"
+    case calf = "Calf"
 
     var id: String { rawValue }
 }
@@ -27,14 +28,18 @@ enum CattleType: String, CaseIterable, Identifiable {
 
 enum CattleStatus: String, CaseIterable, Identifiable {
     case active = "Active"
+    case inactive = "Inactive"
     case sold = "Sold"
     case processed = "Processed"
     case deceased = "Deceased"
+    case reference = "Reference"
 
     var id: String { rawValue }
 }
 
-enum CattleStage: String, CaseIterable, Identifiable {
+// Legacy enum - kept for backward compatibility with existing code
+// New dynamic lookups use CattleStage Core Data entity
+enum LegacyCattleStage: String, CaseIterable, Identifiable {
     case calf = "Calf"
     case weanling = "Weanling"
     case stocker = "Stocker"
@@ -60,7 +65,9 @@ enum CattleStage: String, CaseIterable, Identifiable {
     }
 }
 
-enum ProductionPath: String, CaseIterable, Identifiable {
+// Legacy enum - kept for backward compatibility with existing code
+// New dynamic lookups use ProductionPath Core Data entity
+enum LegacyProductionPath: String, CaseIterable, Identifiable {
     case beefFinishing = "BeefFinishing"
     case breeding = "Breeding"
     case dairy = "Dairy"
@@ -92,7 +99,9 @@ enum BreedCategory: String, CaseIterable, Identifiable {
 
 // MARK: - Health Record Enums
 
-enum HealthRecordType: String, CaseIterable, Identifiable {
+// Legacy enum - kept for backward compatibility with existing code
+// New dynamic lookups use HealthRecordType Core Data entity
+enum LegacyHealthRecordType: String, CaseIterable, Identifiable {
     case illness = "Illness"
     case treatment = "Treatment"
     case vaccination = "Vaccination"
@@ -221,8 +230,8 @@ enum WeightUnit: String, CaseIterable {
 // MARK: - Helper Structs
 
 struct StagePromotionInfo {
-    let fromStage: CattleStage
-    let toStage: CattleStage
+    let fromStage: LegacyCattleStage
+    let toStage: LegacyCattleStage
     let recommendedMinimumWeightLbs: Decimal?
     let typicalAgeMonths: Int?
 

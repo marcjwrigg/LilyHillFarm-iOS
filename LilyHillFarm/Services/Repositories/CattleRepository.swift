@@ -133,19 +133,20 @@ class CattleRepository: BaseSyncManager {
         print("   Last sync: \(lastSync)")
         print("   Farm ID: \(farmId)")
 
-        // 1. Fetch all ACTIVE cattle from Supabase
-        print("   📥 Fetching active cattle...")
+        // 1. Fetch CHANGED/NEW cattle from Supabase (modified since last sync)
+        print("   📥 Fetching cattle modified since \(lastSync)...")
         let activeRecordsData = try await supabase.client
             .from(SupabaseConfig.Tables.cattle)
             .select()
             .eq("farm_id", value: farmId.uuidString)
             .is("deleted_at", value: nil)
+            .gte("updated_at", value: lastSync.ISO8601Format())
             .execute()
             .data
 
         let decoder = JSONDecoder()
         let cattleDTOs = try decoder.decode([CattleDTO].self, from: activeRecordsData)
-        print("   ✅ Fetched \(cattleDTOs.count) active cattle")
+        print("   ✅ Fetched \(cattleDTOs.count) modified/new cattle")
 
         // 2. Fetch records deleted since last sync
         print("   📥 Fetching deleted records...")
@@ -231,22 +232,27 @@ class CattleRepository: BaseSyncManager {
                 }
             }
 
-            // 7. Handle orphaned records (exist locally but not in server's active or deleted sets)
-            let serverIdSet = Set(cattleDTOs.map { $0.id })
-            let deletedIdSet = Set(deletedRecords.map { $0.id })
-            let orphanedIds = localIdSet.subtracting(serverIdSet).subtracting(deletedIdSet)
+            // 7. Handle orphaned records ONLY during full sync (when lastSync is distantPast)
+            // During incremental sync, we can't determine orphans because we only fetched changed records
+            if lastSync == Date.distantPast {
+                let serverIdSet = Set(cattleDTOs.map { $0.id })
+                let deletedIdSet = Set(deletedRecords.map { $0.id })
+                let orphanedIds = localIdSet.subtracting(serverIdSet).subtracting(deletedIdSet)
 
-            if !orphanedIds.isEmpty {
-                print("   ⚠️ Found \(orphanedIds.count) orphaned cattle to hard delete")
-                for orphanedId in orphanedIds {
-                    let fetchRequest: NSFetchRequest<Cattle> = Cattle.fetchRequest()
-                    fetchRequest.predicate = NSPredicate(format: "id == %@", orphanedId as CVarArg)
+                if !orphanedIds.isEmpty {
+                    print("   ⚠️ Found \(orphanedIds.count) orphaned cattle to hard delete (full sync only)")
+                    for orphanedId in orphanedIds {
+                        let fetchRequest: NSFetchRequest<Cattle> = Cattle.fetchRequest()
+                        fetchRequest.predicate = NSPredicate(format: "id == %@", orphanedId as CVarArg)
 
-                    if let cattle = try self.context.fetch(fetchRequest).first {
-                        self.context.delete(cattle)
-                        print("   🗑️ Hard deleted cattle \(orphanedId)")
+                        if let cattle = try self.context.fetch(fetchRequest).first {
+                            self.context.delete(cattle)
+                            print("   🗑️ Hard deleted cattle \(orphanedId)")
+                        }
                     }
                 }
+            } else {
+                print("   ℹ️ Skipping orphan detection (incremental sync)")
             }
 
             // 8. Save changes

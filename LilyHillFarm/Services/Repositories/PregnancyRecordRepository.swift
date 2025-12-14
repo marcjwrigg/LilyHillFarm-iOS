@@ -117,7 +117,6 @@ class PregnancyRecordRepository: BaseSyncManager {
     // MARK: - Sync
 
     /// Sync all pregnancy records: fetch from Supabase and update Core Data with deletion support
-    /// Since pregnancy_records don't have farm_id, we need to fetch by user's cattle IDs
     func syncFromSupabase() async throws {
         try requireAuth()
 
@@ -128,45 +127,27 @@ class PregnancyRecordRepository: BaseSyncManager {
         print("   Last sync: \(lastSync)")
         print("   Farm ID: \(farmId)")
 
-        // 1. Get all cattle IDs for this farm from Core Data
-        var cattleIds: [UUID] = []
-        try await context.perform { [weak self] in
-            guard let self = self else { return }
-            let fetchRequest: NSFetchRequest<Cattle> = Cattle.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "farmId == %@ AND deletedAt == nil", farmId as CVarArg)
-            fetchRequest.propertiesToFetch = ["id"]
-            let cattle = try self.context.fetch(fetchRequest)
-            cattleIds = cattle.compactMap { $0.id }
-        }
-
-        guard !cattleIds.isEmpty else {
-            print("   ⚠️ No cattle found for farm, skipping pregnancy sync")
-            return
-        }
-
-        print("   📊 Found \(cattleIds.count) cattle for this farm")
-
-        // 2. Fetch active pregnancy records for these cattle
-        print("   📥 Fetching active pregnancy records...")
-        let cattleIdStrings = cattleIds.map { $0.uuidString }
+        // Fetch CHANGED/NEW pregnancy records for this farm (modified since last sync)
+        print("   📥 Fetching pregnancy records modified since \(lastSync)...")
         let activeRecordsData = try await supabase.client
             .from(SupabaseConfig.Tables.pregnancyRecords)
             .select()
-            .in("cow_id", values: cattleIdStrings)
+            .eq("farm_id", value: farmId.uuidString)
             .is("deleted_at", value: nil)
+            .gte("updated_at", value: lastSync.ISO8601Format())
             .execute()
             .data
 
         let decoder = JSONDecoder()
         let activeRecords = try decoder.decode([PregnancyRecordDTO].self, from: activeRecordsData)
-        print("   ✅ Fetched \(activeRecords.count) active pregnancy records")
+        print("   ✅ Fetched \(activeRecords.count) modified/new pregnancy records")
 
-        // 3. Fetch records deleted since last sync
+        // Fetch records deleted since last sync
         print("   📥 Fetching deleted records since last sync...")
         let deletedRecordsData = try await supabase.client
             .from(SupabaseConfig.Tables.pregnancyRecords)
             .select("id, deleted_at")
-            .in("cow_id", values: cattleIdStrings)
+            .eq("farm_id", value: farmId.uuidString)
             .gt("deleted_at", value: lastSync.ISO8601Format())
             .execute()
             .data
@@ -235,23 +216,27 @@ class PregnancyRecordRepository: BaseSyncManager {
                 }
             }
 
-            // 7. Handle orphaned records (exist locally but not in server's active set)
-            let serverIdSet = Set(activeRecords.map { $0.id })
-            let deletedIdSet = Set(deletedRecords.map { $0.id })
-            let orphanedIds = localIdSet.subtracting(serverIdSet).subtracting(deletedIdSet)
+            // 7. Handle orphaned records ONLY during full sync (when lastSync is distantPast)
+            // During incremental sync, we can't determine orphans because we only fetched changed records
+            if lastSync == Date.distantPast {
+                let serverIdSet = Set(activeRecords.map { $0.id })
+                let deletedIdSet = Set(deletedRecords.map { $0.id })
+                let orphanedIds = localIdSet.subtracting(serverIdSet).subtracting(deletedIdSet)
 
-            if !orphanedIds.isEmpty {
-                print("   ⚠️ Found \(orphanedIds.count) orphaned pregnancy records")
-                print("   🗑️ Hard deleting orphaned records (not found on server)...")
-                for orphanedId in orphanedIds {
-                    let fetchRequest: NSFetchRequest<PregnancyRecord> = PregnancyRecord.fetchRequest()
-                    fetchRequest.predicate = NSPredicate(format: "id == %@", orphanedId as CVarArg)
+                if !orphanedIds.isEmpty {
+                    print("   ⚠️ Found \(orphanedIds.count) orphaned pregnancy records to hard delete (full sync only)")
+                    for orphanedId in orphanedIds {
+                        let fetchRequest: NSFetchRequest<PregnancyRecord> = PregnancyRecord.fetchRequest()
+                        fetchRequest.predicate = NSPredicate(format: "id == %@", orphanedId as CVarArg)
 
-                    if let record = try self.context.fetch(fetchRequest).first {
-                        self.context.delete(record)
-                        print("   🗑️ Hard deleted PregnancyRecord \(orphanedId)")
+                        if let record = try self.context.fetch(fetchRequest).first {
+                            self.context.delete(record)
+                            print("   🗑️ Hard deleted PregnancyRecord \(orphanedId)")
+                        }
                     }
                 }
+            } else {
+                print("   ℹ️ Skipping orphan detection (incremental sync)")
             }
 
             // 8. Save context

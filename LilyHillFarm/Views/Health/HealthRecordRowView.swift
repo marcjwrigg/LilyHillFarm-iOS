@@ -12,7 +12,7 @@ struct HealthRecordRowView: View {
     @ObservedObject var record: HealthRecord
 
     var typeIcon: String {
-        guard let type = HealthRecordType(rawValue: record.recordType ?? "") else {
+        guard let type = LegacyHealthRecordType(rawValue: record.recordType ?? "") else {
             return "heart.text.square"
         }
 
@@ -37,7 +37,7 @@ struct HealthRecordRowView: View {
     }
 
     var typeColor: Color {
-        guard let type = HealthRecordType(rawValue: record.recordType ?? "") else {
+        guard let type = LegacyHealthRecordType(rawValue: record.recordType ?? "") else {
             return .gray
         }
 

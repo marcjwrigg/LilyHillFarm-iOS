@@ -135,7 +135,7 @@ extension CattleDTO {
         self.salePrice = cattle.salePrice?.doubleValue
         self.notes = cattle.notes
         self.tags = cattle.tags // Tags is now String? matching Core Data
-        self.location = cattle.location as? [String] ?? nil // Transformable array
+        self.location = cattle.location as? [String] // Transformable array
         self.pastureId = cattle.pastureId
         self.breedId = cattle.breed?.id
         self.damId = cattle.dam?.id
@@ -180,7 +180,7 @@ extension CattleDTO {
         cattle.salePrice = self.salePrice.map { NSDecimalNumber(value: $0) }
         cattle.notes = self.notes
         cattle.tags = self.tags
-        cattle.location = self.location  // Transformable array
+        cattle.location = self.location.map { $0 as NSArray }  // Convert [String] to NSArray
         cattle.pastureId = self.pastureId
         cattle.externalSireName = self.externalSireName
         cattle.externalSireRegistration = self.externalSireRegistration

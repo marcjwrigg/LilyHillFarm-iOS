@@ -127,45 +127,27 @@ class HealthRecordRepository: BaseSyncManager {
         print("   Last sync: \(lastSync)")
         print("   Farm ID: \(farmId)")
 
-        // 1. Get all cattle IDs for this farm from Core Data
-        var cattleIds: [UUID] = []
-        try await context.perform { [weak self] in
-            guard let self = self else { return }
-            let fetchRequest: NSFetchRequest<Cattle> = Cattle.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "farmId == %@ AND deletedAt == nil", farmId as CVarArg)
-            fetchRequest.propertiesToFetch = ["id"]
-            let cattle = try self.context.fetch(fetchRequest)
-            cattleIds = cattle.compactMap { $0.id }
-        }
-
-        guard !cattleIds.isEmpty else {
-            print("   ⚠️ No cattle found for farm, skipping health records sync")
-            return
-        }
-
-        print("   📊 Found \(cattleIds.count) cattle for this farm")
-
-        // 2. Fetch active health records for these cattle
-        print("   📥 Fetching active health records...")
-        let cattleIdStrings = cattleIds.map { $0.uuidString }
+        // Fetch CHANGED/NEW health records for this farm (modified since last sync)
+        print("   📥 Fetching health records modified since \(lastSync)...")
         let activeRecordsData = try await supabase.client
             .from(SupabaseConfig.Tables.healthRecords)
             .select()
-            .in("cattle_id", values: cattleIdStrings)
+            .eq("farm_id", value: farmId.uuidString)
             .is("deleted_at", value: nil)
+            .gte("updated_at", value: lastSync.ISO8601Format())
             .execute()
             .data
 
         let decoder = JSONDecoder()
         let activeRecords = try decoder.decode([HealthRecordDTO].self, from: activeRecordsData)
-        print("   ✅ Fetched \(activeRecords.count) active health records")
+        print("   ✅ Fetched \(activeRecords.count) modified/new health records")
 
-        // 3. Fetch records deleted since last sync
+        // Fetch records deleted since last sync
         print("   📥 Fetching deleted records since last sync...")
         let deletedRecordsData = try await supabase.client
             .from(SupabaseConfig.Tables.healthRecords)
             .select("id, deleted_at")
-            .in("cattle_id", values: cattleIdStrings)
+            .eq("farm_id", value: farmId.uuidString)
             .gt("deleted_at", value: lastSync.ISO8601Format())
             .execute()
             .data
@@ -204,12 +186,14 @@ class HealthRecordRepository: BaseSyncManager {
                 healthDTO.update(healthRecord)
 
                 // Resolve cattle relationship
-                let cattleFetch: NSFetchRequest<Cattle> = Cattle.fetchRequest()
-                cattleFetch.predicate = NSPredicate(format: "id == %@", healthDTO.cattleId as CVarArg)
-                if let cattle = try self.context.fetch(cattleFetch).first {
-                    healthRecord.cattle = cattle
-                    // Set farmId from cattle
-                    healthRecord.farmId = cattle.farmId
+                if let cattleId = healthDTO.cattleId {
+                    let cattleFetch: NSFetchRequest<Cattle> = Cattle.fetchRequest()
+                    cattleFetch.predicate = NSPredicate(format: "id == %@", cattleId as CVarArg)
+                    if let cattle = try self.context.fetch(cattleFetch).first {
+                        healthRecord.cattle = cattle
+                        // Set farmId from cattle
+                        healthRecord.farmId = cattle.farmId
+                    }
                 }
 
                 // Resolve treatment plan relationship (if present)
@@ -234,23 +218,27 @@ class HealthRecordRepository: BaseSyncManager {
                 }
             }
 
-            // 7. Handle orphaned records
-            let serverIdSet = Set(activeRecords.map { $0.id })
-            let deletedIdSet = Set(deletedRecords.map { $0.id })
-            let orphanedIds = localIdSet.subtracting(serverIdSet).subtracting(deletedIdSet)
+            // 7. Handle orphaned records ONLY during full sync (when lastSync is distantPast)
+            // During incremental sync, we can't determine orphans because we only fetched changed records
+            if lastSync == Date.distantPast {
+                let serverIdSet = Set(activeRecords.map { $0.id })
+                let deletedIdSet = Set(deletedRecords.map { $0.id })
+                let orphanedIds = localIdSet.subtracting(serverIdSet).subtracting(deletedIdSet)
 
-            if !orphanedIds.isEmpty {
-                print("   ⚠️ Found \(orphanedIds.count) orphaned health records")
-                print("   🗑️ Hard deleting orphaned records...")
-                for orphanedId in orphanedIds {
-                    let fetchRequest: NSFetchRequest<HealthRecord> = HealthRecord.fetchRequest()
-                    fetchRequest.predicate = NSPredicate(format: "id == %@", orphanedId as CVarArg)
+                if !orphanedIds.isEmpty {
+                    print("   ⚠️ Found \(orphanedIds.count) orphaned health records to hard delete (full sync only)")
+                    for orphanedId in orphanedIds {
+                        let fetchRequest: NSFetchRequest<HealthRecord> = HealthRecord.fetchRequest()
+                        fetchRequest.predicate = NSPredicate(format: "id == %@", orphanedId as CVarArg)
 
-                    if let record = try self.context.fetch(fetchRequest).first {
-                        self.context.delete(record)
-                        print("   🗑️ Hard deleted HealthRecord \(orphanedId)")
+                        if let record = try self.context.fetch(fetchRequest).first {
+                            self.context.delete(record)
+                            print("   🗑️ Hard deleted HealthRecord \(orphanedId)")
+                        }
                     }
                 }
+            } else {
+                print("   ℹ️ Skipping orphan detection (incremental sync)")
             }
 
             // 8. Save context

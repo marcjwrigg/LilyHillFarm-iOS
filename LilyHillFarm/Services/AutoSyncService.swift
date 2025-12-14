@@ -217,52 +217,73 @@ class AutoSyncService: ObservableObject {
     }
 
     private func pushUpdatedObjects(_ objects: Set<NSManagedObject>) async {
+        print("🔍 AutoSync: Processing \(objects.count) updated objects")
+
         for object in objects {
+            // Check if we're online - if not, queue for later
+            guard networkMonitor.isSuitableForSync else {
+                print("📵 AutoSync: Offline - queueing \(type(of: object)) update for later")
+                queueOperation(for: object, operation: .update)
+                setSyncStatus(object, status: "pending")
+                continue
+            }
+
             do {
                 switch object {
                 case let contact as Contact:
                     print("📤 AutoSync: Pushing updated contact \(contact.name ?? "unknown")")
                     _ = try await contactRepository.update(contact)
+                    setSyncStatus(contact, status: "synced")
 
                 case let cattle as Cattle:
                     print("📤 AutoSync: Pushing updated cattle \(cattle.tagNumber ?? "unknown")")
                     _ = try await cattleRepository.update(cattle)
+                    setSyncStatus(cattle, status: "synced")
 
                 case let healthRecord as HealthRecord:
                     print("📤 AutoSync: Pushing updated health record")
                     _ = try await healthRecordRepository.update(healthRecord)
+                    setSyncStatus(healthRecord, status: "synced")
 
                 case let pregnancy as PregnancyRecord:
                     print("📤 AutoSync: Pushing updated pregnancy record")
                     _ = try await pregnancyRecordRepository.update(pregnancy)
+                    setSyncStatus(pregnancy, status: "synced")
 
                 case let calvingRecord as CalvingRecord:
                     print("📤 AutoSync: Pushing updated calving record")
                     _ = try await calvingRecordRepository.update(calvingRecord)
+                    setSyncStatus(calvingRecord, status: "synced")
 
                 case let saleRecord as SaleRecord:
                     print("📤 AutoSync: Pushing updated sale record")
                     _ = try await saleRecordRepository.update(saleRecord)
+                    setSyncStatus(saleRecord, status: "synced")
 
                 case let processingRecord as ProcessingRecord:
                     print("📤 AutoSync: Pushing updated processing record")
                     _ = try await processingRecordRepository.update(processingRecord)
+                    setSyncStatus(processingRecord, status: "synced")
 
                 case let mortalityRecord as MortalityRecord:
                     print("📤 AutoSync: Pushing updated mortality record")
                     _ = try await mortalityRecordRepository.update(mortalityRecord)
+                    setSyncStatus(mortalityRecord, status: "synced")
 
                 case let stageTransition as StageTransition:
                     print("📤 AutoSync: Pushing updated stage transition")
                     _ = try await stageTransitionRepository.update(stageTransition)
+                    setSyncStatus(stageTransition, status: "synced")
 
                 case let photo as Photo:
                     print("📤 AutoSync: Pushing updated photo")
                     try await photoRepository.pushToSupabase(photo)
+                    setSyncStatus(photo, status: "synced")
 
                 case let task as Task:
                     print("📤 AutoSync: Pushing updated task \(task.title ?? "untitled")")
                     try await taskRepository.pushToSupabase(task)
+                    setSyncStatus(task, status: "synced")
 
                 default:
                     break
@@ -271,17 +292,33 @@ class AutoSyncService: ObservableObject {
                 // Handle foreign key constraint errors gracefully
                 if error.code == "23503" {
                     print("⚠️ AutoSync: Skipping \(type(of: object)) due to missing relationship (foreign key constraint)")
+                    // Don't queue foreign key errors - they won't resolve on retry
                 } else {
                     print("❌ AutoSync: Failed to update \(type(of: object)): \(error)")
+                    // Queue for retry
+                    queueOperation(for: object, operation: .update)
+                    setSyncStatus(object, status: "pending")
                 }
             } catch {
                 print("❌ AutoSync: Failed to update \(type(of: object)): \(error)")
+                // Queue for retry
+                queueOperation(for: object, operation: .update)
+                setSyncStatus(object, status: "pending")
             }
         }
     }
 
     private func pushDeletedObjects(_ objects: Set<NSManagedObject>) async {
+        print("🔍 AutoSync: Processing \(objects.count) deleted objects")
+
         for object in objects {
+            // Check if we're online - if not, queue for later
+            guard networkMonitor.isSuitableForSync else {
+                print("📵 AutoSync: Offline - queueing \(type(of: object)) delete for later")
+                queueOperation(for: object, operation: .delete)
+                continue
+            }
+
             do {
                 switch object {
                 case let contact as Contact:
@@ -355,6 +392,8 @@ class AutoSyncService: ObservableObject {
                 }
             } catch {
                 print("❌ AutoSync: Failed to delete \(type(of: object)): \(error)")
+                // Queue for retry
+                queueOperation(for: object, operation: .delete)
             }
         }
     }

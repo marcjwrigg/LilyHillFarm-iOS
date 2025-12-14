@@ -273,7 +273,9 @@ struct HistoricalPregnancyRowView: View {
         // Fetch calving record for this pregnancy
         _calvingRecords = FetchRequest<CalvingRecord>(
             sortDescriptors: [],
-            predicate: NSPredicate(format: "pregnancyID == %@", pregnancy.id as CVarArg)
+            predicate: pregnancy.id != nil
+                ? NSPredicate(format: "pregnancyId == %@", pregnancy.id! as CVarArg)
+                : NSPredicate(value: false)
         )
     }
 

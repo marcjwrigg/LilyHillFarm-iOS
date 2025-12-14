@@ -9,7 +9,7 @@ import Foundation
 import Combine
 import SwiftUI
 import Supabase
-import CoreData
+internal import CoreData
 
 @MainActor
 class TasksViewModel: ObservableObject {
@@ -29,8 +29,9 @@ class TasksViewModel: ObservableObject {
         // Observe Core Data changes
         NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange, object: context)
             .sink { [weak self] _ in
-                Task { @MainActor in
-                    await self?.loadTasksFromCoreData()
+                let weakSelf = self
+                _Concurrency.Task { @MainActor in
+                    await weakSelf?.loadTasksFromCoreData()
                 }
             }
             .store(in: &cancellables)
@@ -61,29 +62,41 @@ class TasksViewModel: ObservableObject {
     }
 
     private func loadTasksFromCoreData() async {
-        let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
+        await context.perform { [weak self] in
+            guard let self = self else { return }
 
-        // Sort by due date and priority
-        fetchRequest.sortDescriptors = [
-            NSSortDescriptor(key: "dueDate", ascending: true),
-            NSSortDescriptor(key: "priority", ascending: false)
-        ]
+            let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
 
-        // Filter out soft-deleted tasks
-        fetchRequest.predicate = NSPredicate(format: "deletedAt == nil")
+            // Sort by due date and priority
+            fetchRequest.sortDescriptors = [
+                NSSortDescriptor(key: "dueDate", ascending: true),
+                NSSortDescriptor(key: "priority", ascending: false)
+            ]
 
-        do {
-            let coreDataTasks = try context.fetch(fetchRequest)
-            self.tasks = coreDataTasks.map { TaskItem(from: $0) }
+            // Filter out soft-deleted tasks
+            fetchRequest.predicate = NSPredicate(format: "deletedAt == nil")
 
-            print("📊 Loaded \(self.tasks.count) tasks from Core Data")
-            print("  - Pending: \(self.tasks.filter { $0.status == "pending" }.count)")
-            print("  - In Progress: \(self.tasks.filter { $0.status == "in_progress" }.count)")
-            print("  - Completed: \(self.tasks.filter { $0.status == "completed" }.count)")
+            do {
+                let coreDataTasks = try self.context.fetch(fetchRequest)
 
-        } catch {
-            print("❌ Failed to load tasks from Core Data: \(error)")
-            errorMessage = error.localizedDescription
+                // Map to TaskItems on main thread
+                let taskItems = coreDataTasks.map { TaskItem(from: $0) }
+
+                _Concurrency.Task { @MainActor in
+                    self.tasks = taskItems
+
+                    print("📊 Loaded \(taskItems.count) tasks from Core Data")
+                    print("  - Pending: \(taskItems.filter { $0.status == "pending" }.count)")
+                    print("  - In Progress: \(taskItems.filter { $0.status == "in_progress" }.count)")
+                    print("  - Completed: \(taskItems.filter { $0.status == "completed" }.count)")
+                }
+
+            } catch {
+                print("❌ Failed to load tasks from Core Data: \(error)")
+                _Concurrency.Task { @MainActor in
+                    self.errorMessage = error.localizedDescription
+                }
+            }
         }
     }
 

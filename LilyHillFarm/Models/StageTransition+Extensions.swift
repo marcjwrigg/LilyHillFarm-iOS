@@ -41,7 +41,7 @@ extension StageTransition {
 
     // MARK: - Factory Methods
 
-    static func create(for cattle: Cattle, toStage: CattleStage, in context: NSManagedObjectContext) -> StageTransition {
+    static func create(for cattle: Cattle, toStage: LegacyCattleStage, in context: NSManagedObjectContext) -> StageTransition {
         let transition = StageTransition(context: context)
         transition.id = UUID()
         transition.cattle = cattle

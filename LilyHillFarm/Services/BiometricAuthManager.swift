@@ -84,6 +84,8 @@ class BiometricAuthManager: ObservableObject {
             biometricType = .touchID
         case .none:
             biometricType = .none
+        case .opticID:
+            biometricType = .none // Or handle opticID if needed
         @unknown default:
             biometricType = .none
         }

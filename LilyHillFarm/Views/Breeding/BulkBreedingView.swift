@@ -282,7 +282,7 @@ struct BulkBreedingView: View {
             animal.tagNumber = "LHF-C\(String(format: "%03d", i))"
             animal.name = "Cow \(i)"
             animal.sex = CattleSex.cow.rawValue
-            animal.currentStage = CattleStage.breeding.rawValue
+            animal.currentStage = LegacyCattleStage.breeding.rawValue
             cattle.append(animal)
         }
 

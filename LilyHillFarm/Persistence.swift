@@ -40,8 +40,8 @@ class PersistenceController {
         bull.dateOfBirth = Calendar.current.date(byAdding: .year, value: -3, to: Date())
         bull.color = "Black"
         bull.currentStatus = CattleStatus.active.rawValue
-        bull.currentStage = CattleStage.breeding.rawValue
-        bull.productionPath = ProductionPath.breeding.rawValue
+        bull.currentStage = LegacyCattleStage.breeding.rawValue
+        bull.productionPath = LegacyProductionPath.breeding.rawValue
         bull.currentWeight = NSDecimalNumber(decimal: Decimal(1850))
         bull.createdAt = Date()
         bull.modifiedAt = Date()
@@ -57,8 +57,8 @@ class PersistenceController {
         cow.dateOfBirth = Calendar.current.date(byAdding: .year, value: -4, to: Date())
         cow.color = "Black"
         cow.currentStatus = CattleStatus.active.rawValue
-        cow.currentStage = CattleStage.breeding.rawValue
-        cow.productionPath = ProductionPath.breeding.rawValue
+        cow.currentStage = LegacyCattleStage.breeding.rawValue
+        cow.productionPath = LegacyProductionPath.breeding.rawValue
         cow.currentWeight = NSDecimalNumber(decimal: Decimal(1250))
         cow.createdAt = Date()
         cow.modifiedAt = Date()
@@ -74,8 +74,8 @@ class PersistenceController {
         heifer.dateOfBirth = Calendar.current.date(byAdding: .month, value: -18, to: Date())
         heifer.color = "Red & White"
         heifer.currentStatus = CattleStatus.active.rawValue
-        heifer.currentStage = CattleStage.breeding.rawValue
-        heifer.productionPath = ProductionPath.breeding.rawValue
+        heifer.currentStage = LegacyCattleStage.breeding.rawValue
+        heifer.productionPath = LegacyProductionPath.breeding.rawValue
         heifer.currentWeight = NSDecimalNumber(decimal: Decimal(950))
         heifer.createdAt = Date()
         heifer.modifiedAt = Date()
@@ -91,8 +91,8 @@ class PersistenceController {
         feeder.dateOfBirth = Calendar.current.date(byAdding: .month, value: -14, to: Date())
         feeder.color = "Black"
         feeder.currentStatus = CattleStatus.active.rawValue
-        feeder.currentStage = CattleStage.feeder.rawValue
-        feeder.productionPath = ProductionPath.beefFinishing.rawValue
+        feeder.currentStage = LegacyCattleStage.feeder.rawValue
+        feeder.productionPath = LegacyProductionPath.beefFinishing.rawValue
         feeder.currentWeight = NSDecimalNumber(decimal: Decimal(850))
         feeder.finishingStartDate = Calendar.current.date(byAdding: .month, value: -2, to: Date())
         feeder.createdAt = Date()
@@ -109,8 +109,8 @@ class PersistenceController {
         calf.dateOfBirth = Calendar.current.date(byAdding: .month, value: -4, to: Date())
         calf.color = "Red & White"
         calf.currentStatus = CattleStatus.active.rawValue
-        calf.currentStage = CattleStage.calf.rawValue
-        calf.productionPath = ProductionPath.beefFinishing.rawValue
+        calf.currentStage = LegacyCattleStage.calf.rawValue
+        calf.productionPath = LegacyProductionPath.beefFinishing.rawValue
         calf.currentWeight = NSDecimalNumber(decimal: Decimal(300))
         calf.dam = cow
         calf.sire = bull

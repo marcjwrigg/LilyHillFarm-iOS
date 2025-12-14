@@ -54,6 +54,17 @@ class TreatmentPlanRepository: BaseSyncManager {
     func syncFromSupabase() async throws {
         try requireAuth()
 
+        // Treatment plans are reference data that rarely change
+        // Only sync if it's been more than 24 hours since last sync
+        let tableName = SupabaseConfig.Tables.treatmentPlans
+        if let lastSync = getLastSyncDate(for: tableName) {
+            let hoursSinceLastSync = Date().timeIntervalSince(lastSync) / 3600
+            if hoursSinceLastSync < 24 {
+                print("⏭️ Skipping treatment plans sync (last synced \(String(format: "%.1f", hoursSinceLastSync)) hours ago)")
+                return
+            }
+        }
+
         print("🔄 Fetching treatment plans from Supabase...")
         let planDTOs = try await fetchAll()
         print("✅ Fetched \(planDTOs.count) treatment plans from Supabase")
@@ -84,9 +95,17 @@ class TreatmentPlanRepository: BaseSyncManager {
                 print("      ✅ Saved: \(plan.name ?? "unnamed") with ID: \(plan.id?.uuidString ?? "no id")")
             }
 
-            print("💾 Saving treatment plans to Core Data...")
-            try self.saveContext()
-            print("✅ Treatment plans sync completed!")
+            // Only save if there are actual changes
+            if self.context.hasChanges {
+                print("💾 Saving treatment plans to Core Data...")
+                try self.saveContext()
+                print("✅ Treatment plans sync completed!")
+            } else {
+                print("✅ Treatment plans sync completed (no changes needed)")
+            }
         }
+
+        // Update last sync date
+        setLastSyncDate(Date(), for: tableName)
     }
 }

@@ -31,8 +31,8 @@ struct BulkPromoteStageView: View {
     }
 
     // Group cattle by their next stage (excluding processed)
-    var cattleByNextStage: [(stage: CattleStage, cattle: [Cattle])] {
-        var grouped: [CattleStage: [Cattle]] = [:]
+    var cattleByNextStage: [(stage: LegacyCattleStage, cattle: [Cattle])] {
+        var grouped: [LegacyCattleStage: [Cattle]] = [:]
 
         for cattle in selectedCattle {
             if let nextStage = cattle.nextStage(), nextStage != .processed {
@@ -267,7 +267,7 @@ struct BulkPromoteStageView: View {
             let animal = Cattle.create(in: context)
             animal.tagNumber = "LHF-\(String(format: "%03d", i))"
             animal.name = "Sample \(i)"
-            animal.currentStage = CattleStage.calf.rawValue
+            animal.currentStage = LegacyCattleStage.calf.rawValue
             animal.dateOfBirth = Calendar.current.date(byAdding: .month, value: -7, to: Date())
             cattle.append(animal)
         }

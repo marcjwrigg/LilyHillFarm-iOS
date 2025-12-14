@@ -21,6 +21,7 @@ struct ProcessingRecordDTO: Codable {
     let notes: String?
     let deletedAt: String?
     let createdAt: String?
+    let updatedAt: String?  // Added to match Supabase schema
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -35,6 +36,7 @@ struct ProcessingRecordDTO: Codable {
         case notes
         case deletedAt = "deleted_at"
         case createdAt = "created_at"
+        case updatedAt = "updated_at"  // Added to match Supabase schema
     }
 }
 
@@ -53,6 +55,7 @@ extension ProcessingRecordDTO {
         self.notes = record.notes
         self.deletedAt = record.deletedAt?.toISO8601String()
         self.createdAt = record.createdAt?.toISO8601String()
+        self.updatedAt = Date().toISO8601String()  // Use current time for updates
     }
 
     /// Update Core Data entity from DTO

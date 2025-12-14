@@ -17,6 +17,9 @@ struct SupabaseConfig {
     /// Note: Paste your actual anon key here (starts with eyJ...)
     static let supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuZ2FveXRxdm1qYnJzamFremt5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzMzMjIsImV4cCI6MjA4MDQwOTMyMn0.PmkU-Ed5vYQiB875Sl9bM0Eq_N8bfYJV-tK0kfa5afg"
 
+    /// Vercel deployment URL for Next.js API routes (TTS, AI chat, etc.)
+    static let apiURL = "https://app.lilyhillcattle.com"
+
     // MARK: - Storage Buckets
 
     /// Storage bucket name for cattle photos
@@ -46,6 +49,12 @@ struct SupabaseConfig {
         static let medications = "medications"
         static let veterinarians = "veterinarians"
         static let processors = "processors"
+        static let buyers = "buyers"
+        static let cattleStages = "cattle_stages"
+        static let productionPaths = "production_paths"
+        static let productionPathStages = "production_path_stages"
+        static let pastures = "pastures"
+        static let pastureLogs = "pasture_logs"
     }
 
     // MARK: - Validation

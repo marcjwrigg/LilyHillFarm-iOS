@@ -13,14 +13,22 @@ struct RecordSaleView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
 
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Buyer.name, ascending: true)],
+        predicate: NSPredicate(format: "isActive == YES AND deletedAt == nil"),
+        animation: .default)
+    private var buyers: FetchedResults<Buyer>
+
     // Sale Details
     @State private var saleDate = Date()
-    @State private var buyer = ""
+    @State private var selectedBuyer: Buyer?
     @State private var buyerContact = ""
     @State private var salePrice = ""
     @State private var saleWeight = ""
     @State private var paymentMethod = ""
     @State private var marketType = ""
+    @State private var deliveryDate = Date()
+    @State private var hasDeliveryDate = false
     @State private var notes = ""
 
     // Validation
@@ -74,8 +82,40 @@ struct RecordSaleView: View {
                 Section("Sale Information") {
                     DatePicker("Sale Date", selection: $saleDate, displayedComponents: [.date])
 
-                    TextField("Buyer Name", text: $buyer)
-                    TextField("Buyer Contact (Optional)", text: $buyerContact)
+                    Picker("Buyer", selection: $selectedBuyer) {
+                        Text("Select...").tag(nil as Buyer?)
+                        ForEach(buyers) { buyer in
+                            Text(buyer.displayValue).tag(buyer as Buyer?)
+                        }
+                    }
+
+                    if let buyer = selectedBuyer {
+                        HStack {
+                            Text("Buyer Type")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            if let type = buyer.buyerType {
+                                Text(type)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if let contact = buyer.contactName ?? buyer.phone ?? buyer.email, !contact.isEmpty {
+                            HStack {
+                                Text("Contact")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text(contact)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+
+                    Toggle("Schedule Delivery", isOn: $hasDeliveryDate)
+
+                    if hasDeliveryDate {
+                        DatePicker("Delivery Date", selection: $deliveryDate, displayedComponents: [.date])
+                    }
 
                     Picker("Market Type", selection: $marketType) {
                         Text("Select...").tag("")
@@ -180,8 +220,8 @@ struct RecordSaleView: View {
 
     private func recordSale() {
         // Validation
-        if buyer.trimmingCharacters(in: .whitespaces).isEmpty {
-            errorMessage = "Please enter buyer name"
+        if selectedBuyer == nil {
+            errorMessage = "Please select a buyer"
             showingError = true
             return
         }
@@ -210,8 +250,15 @@ struct RecordSaleView: View {
         // Create sale record
         let saleRecord = SaleRecord.create(for: cattle, in: viewContext)
         saleRecord.saleDate = saleDate
-        // Note: buyer, buyerContact, paymentMethod, marketType removed from SaleRecord Core Data model
-        // Database uses buyer_id UUID FK to contacts table
+
+        // Save buyer ID and name
+        saleRecord.buyerId = selectedBuyer?.id
+        saleRecord.buyerName = selectedBuyer?.name
+
+        // Save delivery date if scheduled
+        if hasDeliveryDate {
+            saleRecord.deliveryDate = deliveryDate
+        }
 
         if let salePriceValue = salePriceValue {
             saleRecord.salePrice = NSDecimalNumber(decimal: salePriceValue)
@@ -226,7 +273,16 @@ struct RecordSaleView: View {
             saleRecord.pricePerPound = NSDecimalNumber(decimal: pricePerLb)
         }
 
-        saleRecord.notes = notes.isEmpty ? nil : notes
+        // Note: paymentMethod and marketType are not stored in SaleRecord Core Data model
+        // These could be added to notes if needed
+        var fullNotes = notes
+        if !paymentMethod.isEmpty {
+            fullNotes += (fullNotes.isEmpty ? "" : "\n") + "Payment Method: \(paymentMethod)"
+        }
+        if !marketType.isEmpty {
+            fullNotes += (fullNotes.isEmpty ? "" : "\n") + "Market Type: \(marketType)"
+        }
+        saleRecord.notes = fullNotes.isEmpty ? nil : fullNotes
 
         // Update cattle status
         cattle.currentStatus = CattleStatus.sold.rawValue
@@ -254,7 +310,7 @@ struct RecordSaleView: View {
         let cattle = Cattle.create(in: context)
         cattle.tagNumber = "LHF-F001"
         cattle.name = "Sample Feeder"
-        cattle.currentStage = CattleStage.feeder.rawValue
+        cattle.currentStage = LegacyCattleStage.feeder.rawValue
         cattle.currentWeight = NSDecimalNumber(decimal: Decimal(1150))
         return cattle
     }())

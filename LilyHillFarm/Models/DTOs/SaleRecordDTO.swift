@@ -11,6 +11,7 @@ import Foundation
 struct SaleRecordDTO: Codable {
     let id: UUID
     let cattleId: UUID
+    let farmId: UUID?
     let buyerId: UUID?  // FK to contacts table
     let saleDate: String?
     let salePrice: Double?
@@ -24,6 +25,7 @@ struct SaleRecordDTO: Codable {
     enum CodingKeys: String, CodingKey {
         case id
         case cattleId = "cattle_id"
+        case farmId = "farm_id"
         case buyerId = "buyer_id"
         case saleDate = "sale_date"
         case salePrice = "sale_price"
@@ -41,6 +43,7 @@ extension SaleRecordDTO {
     init(from record: SaleRecord) {
         self.id = record.id ?? UUID()
         self.cattleId = record.cattle?.id ?? UUID()
+        self.farmId = record.farmId
         self.buyerId = nil  // TODO: iOS stores buyer as String, DB uses buyer_id UUID FK - not currently synced
         self.saleDate = record.saleDate?.toISO8601String()
         self.salePrice = record.salePrice?.doubleValue
@@ -57,6 +60,7 @@ extension SaleRecordDTO {
     func update(_ record: SaleRecord) {
         record.id = self.id
         // cattle relationship handled separately
+        record.farmId = self.farmId
         record.saleDate = self.saleDate?.toDate()
         // buyer/buyerContact not synced from DB (would need Contact lookup)
         record.salePrice = self.salePrice.map { NSDecimalNumber(value: $0) }

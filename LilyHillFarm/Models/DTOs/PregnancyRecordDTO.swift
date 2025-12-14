@@ -22,6 +22,11 @@ struct PregnancyRecordDTO: Codable {
     let breedingDate: String?
     let expectedCalvingDate: String?
     let pregnancyStatus: String?
+    let breedingMethod: String?
+    let aiTechnician: String?
+    let semenSource: String?
+    let externalBullName: String?
+    let externalBullRegistration: String?
     let confirmationMethod: String?
     let confirmationDate: String?
     let notes: String?
@@ -40,6 +45,11 @@ struct PregnancyRecordDTO: Codable {
         case breedingDate = "breeding_date"  // Legacy single date field
         case expectedCalvingDate = "expected_calving_date"  // Legacy single date field
         case pregnancyStatus = "status"  // Database uses "status", iOS uses "pregnancyStatus"
+        case breedingMethod = "breeding_method"
+        case aiTechnician = "ai_technician"
+        case semenSource = "semen_source"
+        case externalBullName = "external_bull_name"
+        case externalBullRegistration = "external_bull_registration"
         case confirmationMethod = "confirmation_method"
         case confirmationDate = "confirmed_date"  // Database uses "confirmed_date", not "confirmation_date"
         case notes
@@ -60,6 +70,11 @@ struct PregnancyRecordDTO: Codable {
         breedingDate: String?,
         expectedCalvingDate: String?,
         pregnancyStatus: String?,
+        breedingMethod: String?,
+        aiTechnician: String?,
+        semenSource: String?,
+        externalBullName: String?,
+        externalBullRegistration: String?,
         confirmationMethod: String?,
         confirmationDate: String?,
         notes: String?,
@@ -77,6 +92,11 @@ struct PregnancyRecordDTO: Codable {
         self.breedingDate = breedingDate
         self.expectedCalvingDate = expectedCalvingDate
         self.pregnancyStatus = pregnancyStatus
+        self.breedingMethod = breedingMethod
+        self.aiTechnician = aiTechnician
+        self.semenSource = semenSource
+        self.externalBullName = externalBullName
+        self.externalBullRegistration = externalBullRegistration
         self.confirmationMethod = confirmationMethod
         self.confirmationDate = confirmationDate
         self.notes = notes
@@ -114,6 +134,11 @@ struct PregnancyRecordDTO: Codable {
         self.breedingDate = try container.decodeIfPresent(String.self, forKey: .breedingDate)
         self.expectedCalvingDate = try container.decodeIfPresent(String.self, forKey: .expectedCalvingDate)
         self.pregnancyStatus = try container.decodeIfPresent(String.self, forKey: .pregnancyStatus)
+        self.breedingMethod = try container.decodeIfPresent(String.self, forKey: .breedingMethod)
+        self.aiTechnician = try container.decodeIfPresent(String.self, forKey: .aiTechnician)
+        self.semenSource = try container.decodeIfPresent(String.self, forKey: .semenSource)
+        self.externalBullName = try container.decodeIfPresent(String.self, forKey: .externalBullName)
+        self.externalBullRegistration = try container.decodeIfPresent(String.self, forKey: .externalBullRegistration)
         self.confirmationMethod = try container.decodeIfPresent(String.self, forKey: .confirmationMethod)
         self.confirmationDate = try container.decodeIfPresent(String.self, forKey: .confirmationDate)
         self.notes = try container.decodeIfPresent(String.self, forKey: .notes)
@@ -135,20 +160,25 @@ extension PregnancyRecordDTO {
         self.damId = record.cow?.id ?? UUID()  // iOS uses "cow", DB uses "dam"
         self.sireId = record.bull?.id  // iOS uses "bull", DB uses "sire"
         self.farmId = record.farmId
-        // Sync both range dates and single dates
-        self.breedingStartDate = record.breedingStartDate?.toISO8601String()
-        self.breedingEndDate = record.breedingEndDate?.toISO8601String()
-        self.breedingDate = record.breedingDate?.toISO8601String()
-        self.expectedCalvingStartDate = record.expectedCalvingStartDate?.toISO8601String()
-        self.expectedCalvingEndDate = record.expectedCalvingEndDate?.toISO8601String()
-        self.expectedCalvingDate = record.expectedCalvingDate?.toISO8601String()
+        // Sync both range dates and single dates (use date-only format to avoid timezone shifts)
+        self.breedingStartDate = record.breedingStartDate?.toDateOnlyString()
+        self.breedingEndDate = record.breedingEndDate?.toDateOnlyString()
+        self.breedingDate = record.breedingDate?.toDateOnlyString()
+        self.expectedCalvingStartDate = record.expectedCalvingStartDate?.toDateOnlyString()
+        self.expectedCalvingEndDate = record.expectedCalvingEndDate?.toDateOnlyString()
+        self.expectedCalvingDate = record.expectedCalvingDate?.toDateOnlyString()
         self.pregnancyStatus = record.status ?? "bred"  // iOS uses "status", DB uses "status"
+        self.breedingMethod = record.breedingMethod
+        self.aiTechnician = record.aiTechnician
+        self.semenSource = record.semenSource
+        self.externalBullName = record.externalBullName
+        self.externalBullRegistration = record.externalBullRegistration
         self.confirmationMethod = record.confirmationMethod
         self.confirmationDate = record.confirmedDate?.toISO8601String()  // iOS uses "confirmedDate", DB uses "confirmed_date"
         self.notes = record.notes
         self.deletedAt = record.deletedAt?.toISO8601String()
         self.createdAt = record.createdAt?.toISO8601String()
-        // Note: iOS Core Data fields not synced: breedingMethod, aiTechnician, semenSource, externalBullName, externalBullRegistration, outcome, modifiedAt
+        // Note: iOS Core Data fields not synced: outcome, modifiedAt
     }
 
     /// Update Core Data entity from DTO
@@ -203,15 +233,25 @@ extension PregnancyRecordDTO {
         // Normalize status to lowercase (DB might have "Confirmed" but iOS expects "confirmed")
         let normalizedStatus = self.pregnancyStatus?.lowercased() ?? "bred"
         record.status = normalizedStatus
+
+        // Set breeding method and AI details
+        record.breedingMethod = self.breedingMethod
+        record.aiTechnician = self.aiTechnician
+        record.semenSource = self.semenSource
+        record.externalBullName = self.externalBullName
+        record.externalBullRegistration = self.externalBullRegistration
+
         record.confirmationMethod = self.confirmationMethod
         record.confirmedDate = self.confirmationDate?.toDate()
         record.notes = self.notes
         record.deletedAt = self.deletedAt?.toDate()
         record.createdAt = self.createdAt?.toDate()
-        // Note: breedingMethod, aiTechnician, semenSource, externalBullName, externalBullRegistration, outcome, modifiedAt not in DB
+        // Note: outcome, modifiedAt not in DB
 
         print("   ✅ Final breedingDate: \(record.breedingDate?.description ?? "nil")")
         print("   ✅ Final expectedCalvingDate: \(record.expectedCalvingDate?.description ?? "nil")")
         print("   ✅ Status: \(normalizedStatus)")
+        print("   ✅ Breeding Method: \(self.breedingMethod ?? "nil")")
+        print("   ✅ External Bull: \(self.externalBullName ?? "nil")")
     }
 }

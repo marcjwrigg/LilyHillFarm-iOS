@@ -67,6 +67,14 @@ class SyncQueueManager: ObservableObject {
     // MARK: - Network Monitoring
 
     private func setupNetworkMonitoring() {
+        // Check current network state immediately
+        if networkMonitor.isConnected && pendingCount > 0 {
+            print("📶 SyncQueueManager: Network already available, processing queue...")
+            _Concurrency.Task { @MainActor in
+                await self.processQueue()
+            }
+        }
+
         // Retry queue when network becomes available
         networkCancellable = networkMonitor.$isConnected
             .sink { [weak self] isConnected in
@@ -74,7 +82,7 @@ class SyncQueueManager: ObservableObject {
 
                 if isConnected && self.pendingCount > 0 {
                     print("📶 SyncQueueManager: Network available, processing queue...")
-                    Task { @MainActor in
+                    _Concurrency.Task { @MainActor in
                         await self.processQueue()
                     }
                 }
@@ -170,9 +178,8 @@ class SyncQueueManager: ObservableObject {
         let fetchRequest: NSFetchRequest<Cattle> = Cattle.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %@", operation.entityId as CVarArg)
 
-        let cattle = try await context.perform { [weak self] in
-            guard let self = self else { return nil }
-            return try self.context.fetch(fetchRequest).first
+        let cattle = try await context.perform {
+            try self.context.fetch(fetchRequest).first
         }
 
         guard let cattle = cattle else {
@@ -193,9 +200,8 @@ class SyncQueueManager: ObservableObject {
         let fetchRequest: NSFetchRequest<HealthRecord> = HealthRecord.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %@", operation.entityId as CVarArg)
 
-        let record = try await context.perform { [weak self] in
-            guard let self = self else { return nil }
-            return try self.context.fetch(fetchRequest).first
+        let record = try await context.perform {
+            try self.context.fetch(fetchRequest).first
         }
 
         guard let record = record else {
@@ -216,9 +222,8 @@ class SyncQueueManager: ObservableObject {
         let fetchRequest: NSFetchRequest<PregnancyRecord> = PregnancyRecord.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %@", operation.entityId as CVarArg)
 
-        let record = try await context.perform { [weak self] in
-            guard let self = self else { return nil }
-            return try self.context.fetch(fetchRequest).first
+        let record = try await context.perform {
+            try self.context.fetch(fetchRequest).first
         }
 
         guard let record = record else {
@@ -239,9 +244,8 @@ class SyncQueueManager: ObservableObject {
         let fetchRequest: NSFetchRequest<CalvingRecord> = CalvingRecord.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %@", operation.entityId as CVarArg)
 
-        let record = try await context.perform { [weak self] in
-            guard let self = self else { return nil }
-            return try self.context.fetch(fetchRequest).first
+        let record = try await context.perform {
+            try self.context.fetch(fetchRequest).first
         }
 
         guard let record = record else {
@@ -262,9 +266,8 @@ class SyncQueueManager: ObservableObject {
         let fetchRequest: NSFetchRequest<SaleRecord> = SaleRecord.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %@", operation.entityId as CVarArg)
 
-        let record = try await context.perform { [weak self] in
-            guard let self = self else { return nil }
-            return try self.context.fetch(fetchRequest).first
+        let record = try await context.perform {
+            try self.context.fetch(fetchRequest).first
         }
 
         guard let record = record else {
@@ -285,9 +288,8 @@ class SyncQueueManager: ObservableObject {
         let fetchRequest: NSFetchRequest<ProcessingRecord> = ProcessingRecord.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %@", operation.entityId as CVarArg)
 
-        let record = try await context.perform { [weak self] in
-            guard let self = self else { return nil }
-            return try self.context.fetch(fetchRequest).first
+        let record = try await context.perform {
+            try self.context.fetch(fetchRequest).first
         }
 
         guard let record = record else {
@@ -308,9 +310,8 @@ class SyncQueueManager: ObservableObject {
         let fetchRequest: NSFetchRequest<MortalityRecord> = MortalityRecord.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %@", operation.entityId as CVarArg)
 
-        let record = try await context.perform { [weak self] in
-            guard let self = self else { return nil }
-            return try self.context.fetch(fetchRequest).first
+        let record = try await context.perform {
+            try self.context.fetch(fetchRequest).first
         }
 
         guard let record = record else {
@@ -331,9 +332,8 @@ class SyncQueueManager: ObservableObject {
         let fetchRequest: NSFetchRequest<StageTransition> = StageTransition.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %@", operation.entityId as CVarArg)
 
-        let record = try await context.perform { [weak self] in
-            guard let self = self else { return nil }
-            return try self.context.fetch(fetchRequest).first
+        let record = try await context.perform {
+            try self.context.fetch(fetchRequest).first
         }
 
         guard let record = record else {
@@ -354,9 +354,8 @@ class SyncQueueManager: ObservableObject {
         let fetchRequest: NSFetchRequest<Photo> = Photo.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %@", operation.entityId as CVarArg)
 
-        let photo = try await context.perform { [weak self] in
-            guard let self = self else { return nil }
-            return try self.context.fetch(fetchRequest).first
+        let photo = try await context.perform {
+            try self.context.fetch(fetchRequest).first
         }
 
         guard let photo = photo else {
@@ -375,9 +374,8 @@ class SyncQueueManager: ObservableObject {
         let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %@", operation.entityId as CVarArg)
 
-        let task = try await context.perform { [weak self] in
-            guard let self = self else { return nil }
-            return try self.context.fetch(fetchRequest).first
+        let task = try await context.perform {
+            try self.context.fetch(fetchRequest).first
         }
 
         guard let task = task else {
@@ -396,9 +394,8 @@ class SyncQueueManager: ObservableObject {
         let fetchRequest: NSFetchRequest<Contact> = Contact.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %@", operation.entityId as CVarArg)
 
-        let contact = try await context.perform { [weak self] in
-            guard let self = self else { return nil }
-            return try self.context.fetch(fetchRequest).first
+        let contact = try await context.perform {
+            try self.context.fetch(fetchRequest).first
         }
 
         guard let contact = contact else {

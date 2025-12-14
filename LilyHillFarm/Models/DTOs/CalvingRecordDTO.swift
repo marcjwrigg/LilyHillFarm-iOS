@@ -59,7 +59,7 @@ extension CalvingRecordDTO {
         self.calfId = record.calf?.id
         self.farmId = record.farmId
         self.pregnancyId = record.pregnancyId
-        self.calvingDate = record.calvingDate?.toISO8601String()
+        self.calvingDate = record.calvingDate?.toDateOnlyString()
         self.difficulty = record.difficulty ?? ""
         // Map iOS sex values to database-compatible values (DB only allows 'Bull' or 'Heifer')
         self.calfSex = Self.mapCalfSexForDatabase(record.calfSex ?? "")

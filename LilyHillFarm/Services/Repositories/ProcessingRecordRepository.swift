@@ -153,7 +153,7 @@ class ProcessingRecordRepository: BaseSyncManager {
     func pushToSupabase(_ record: ProcessingRecord) async throws {
         try requireAuth()
 
-        if let id = record.id {
+        if record.id != nil {
             do {
                 // Try to update, if it fails (doesn't exist), create
                 _ = try await update(record)

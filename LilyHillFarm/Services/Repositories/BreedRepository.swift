@@ -99,9 +99,14 @@ class BreedRepository: BaseSyncManager {
                 dto.update(breed)
             }
 
-            print("💾 Saving breeds to Core Data...")
-            try self.saveContext()
-            print("✅ Breeds sync completed!")
+            // Only save if there are actual changes
+            if self.context.hasChanges {
+                print("💾 Saving breeds to Core Data...")
+                try self.saveContext()
+                print("✅ Breeds sync completed!")
+            } else {
+                print("✅ Breeds sync completed (no changes needed)")
+            }
         }
     }
 }

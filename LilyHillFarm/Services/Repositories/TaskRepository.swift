@@ -141,6 +141,20 @@ class TaskRepository: BaseSyncManager {
 
     /// Sync all tasks: fetch from Supabase and update Core Data
     func syncFromSupabase() async throws {
+        // Check if we have any local tasks
+        let fetchRequest: NSFetchRequest<Task> = Task.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "deletedAt == nil")
+        let localCount = try context.count(for: fetchRequest)
+
+        // If we have 0 local tasks but there's a last sync date, clear it to force full sync
+        if localCount == 0 {
+            let lastSync = getLastSyncDate(for: SupabaseConfig.Tables.tasks)
+            if lastSync != nil {
+                print("⚠️ Found 0 local tasks but last sync exists - forcing full sync")
+                clearLastSyncDate(for: SupabaseConfig.Tables.tasks)
+            }
+        }
+
         try await syncWithDeletions(
             entityType: Task.self,
             tableName: SupabaseConfig.Tables.tasks,

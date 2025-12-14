@@ -15,6 +15,10 @@
 	<string>LilyHillFarm needs permission to save photos to your library</string>
 	<key>NSCameraUsageDescription</key>
 	<string>LilyHillFarm needs access to your camera to take photos of your cattle</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>LilyHillFarm needs access to your microphone to enable voice chat with Marc</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>LilyHillFarm needs speech recognition to transcribe your voice messages to Marc</string>
 	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
 	<true/>
 </dict>

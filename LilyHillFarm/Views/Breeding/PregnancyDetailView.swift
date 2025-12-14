@@ -16,6 +16,21 @@ struct PregnancyDetailView: View {
     @State private var showingEdit = false
     @Environment(\.dismiss) private var dismiss
 
+    // Fetch calving record for this pregnancy
+    @FetchRequest private var calvingRecords: FetchedResults<CalvingRecord>
+
+    init(pregnancy: PregnancyRecord) {
+        self.pregnancy = pregnancy
+
+        // Fetch calving record for this pregnancy
+        _calvingRecords = FetchRequest<CalvingRecord>(
+            sortDescriptors: [],
+            predicate: pregnancy.id != nil
+                ? NSPredicate(format: "pregnancyId == %@", pregnancy.id! as CVarArg)
+                : NSPredicate(value: false)
+        )
+    }
+
     var statusColor: Color {
         guard let status = PregnancyStatus(rawValue: pregnancy.status ?? "") else {
             return .gray
@@ -40,9 +55,11 @@ struct PregnancyDetailView: View {
     }
 
     var canRecordCalving: Bool {
-        pregnancy.status == PregnancyStatus.confirmed.rawValue ||
-        pregnancy.status == PregnancyStatus.bred.rawValue ||
-        pregnancy.status == PregnancyStatus.exposed.rawValue
+        // Can only record calving if no calving record exists yet
+        calvingRecords.first == nil &&
+        (pregnancy.status == PregnancyStatus.confirmed.rawValue ||
+         pregnancy.status == PregnancyStatus.bred.rawValue ||
+         pregnancy.status == PregnancyStatus.exposed.rawValue)
     }
 
     var body: some View {
@@ -58,9 +75,20 @@ struct PregnancyDetailView: View {
                         .font(.title2)
                         .fontWeight(.bold)
 
-                    // Due Date Status - handle both single date and date range
-                    if let calvingStart = pregnancy.expectedCalvingStartDate,
-                       let calvingEnd = pregnancy.expectedCalvingEndDate {
+                    // Due Date Status or Calving Status
+                    if let calving = calvingRecords.first {
+                        // Show calving info if calving record exists
+                        if let calvingDate = calving.calvingDate {
+                            Label("Calved on \(formatDate(calvingDate))", systemImage: "checkmark.circle.fill")
+                                .font(.headline)
+                                .foregroundColor(.green)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.green.opacity(0.1))
+                                .cornerRadius(8)
+                        }
+                    } else if let calvingStart = pregnancy.expectedCalvingStartDate,
+                              let calvingEnd = pregnancy.expectedCalvingEndDate {
                         // Calving date range (for exposed pregnancies)
                         let daysUntilStart = Calendar.current.dateComponents([.day], from: Date(), to: calvingStart).day ?? 0
                         let daysUntilEnd = Calendar.current.dateComponents([.day], from: Date(), to: calvingEnd).day ?? 0
@@ -183,9 +211,62 @@ struct PregnancyDetailView: View {
                             }
                         }
                         .buttonStyle(.plain)
+                    } else if let externalBullName = pregnancy.externalBullName, !externalBullName.isEmpty {
+                        // AI bull (external)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(externalBullName)
+                                .font(.headline)
+                            Text("AI Bull")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            if let registration = pregnancy.externalBullRegistration, !registration.isEmpty {
+                                Text("Reg: \(registration)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     } else {
                         Text("Unknown Sire")
                             .foregroundColor(.secondary)
+                    }
+                }
+
+                // Calf Information (if calving record exists)
+                if let calving = calvingRecords.first, let calf = calving.calf {
+                    InfoCard(title: "Calf") {
+                        NavigationLink(destination: CattleDetailView(cattle: calf)) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(calf.displayName)
+                                        .font(.headline)
+                                    Text(calf.tagNumber ?? "No Tag")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    if let breed = calf.breed?.name {
+                                        Text(breed)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider()
+
+                        if let weight = calving.calfBirthWeight as? Decimal, weight > 0 {
+                            InfoRow(label: "Birth Weight", value: "\(weight as NSNumber) lbs")
+                        }
+
+                        if let sex = calf.sex {
+                            InfoRow(label: "Sex", value: sex)
+                        }
+
+                        InfoRow(label: "Current Age", value: calf.age)
                     }
                 }
 
@@ -216,6 +297,15 @@ struct PregnancyDetailView: View {
                     }
 
                     InfoRow(label: "Method", value: pregnancy.displayMethod)
+
+                    // AI details
+                    if let aiTech = pregnancy.aiTechnician, !aiTech.isEmpty {
+                        InfoRow(label: "AI Technician", value: aiTech)
+                    }
+
+                    if let semenSource = pregnancy.semenSource, !semenSource.isEmpty {
+                        InfoRow(label: "Semen Source", value: semenSource)
+                    }
 
                     if pregnancy.expectedCalvingDate != nil {
                         Divider()
@@ -250,6 +340,68 @@ struct PregnancyDetailView: View {
                     if pregnancy.confirmedDate != nil {
                         Divider()
                         InfoRow(label: "Confirmation Date", value: pregnancy.displayConfirmationDate)
+                        if let confirmMethod = pregnancy.confirmationMethod {
+                            InfoRow(label: "Confirmation Method", value: confirmMethod)
+                        }
+                    }
+                }
+
+                // Calving Details (if calving record exists)
+                if let calving = calvingRecords.first {
+                    InfoCard(title: "Calving Details") {
+                        if let calvingDate = calving.calvingDate {
+                            InfoRow(label: "Calving Date", value: formatDate(calvingDate))
+
+                            // Show days since calving
+                            if let daysSince = daysSinceCalving(calvingDate) {
+                                InfoRow(label: "Days Since Calving", value: "\(daysSince) day\(daysSince == 1 ? "" : "s")")
+                            }
+                        }
+
+                        if calving.difficulty != nil {
+                            InfoRow(label: "Calving Ease", value: calving.displayDifficulty)
+                        }
+
+                        if calving.veterinarianCalled {
+                            Divider()
+                            InfoRow(label: "Veterinarian Called", value: "Yes")
+                            if let assistance = calving.assistanceProvided, !assistance.isEmpty {
+                                InfoRow(label: "Assistance Provided", value: assistance)
+                            }
+                        }
+
+                        // Gestation length
+                        if let gestationDays = pregnancy.gestationDays {
+                            Divider()
+                            InfoRow(label: "Gestation Length", value: "\(gestationDays) days")
+                        }
+
+                        if let notes = calving.notes, !notes.isEmpty {
+                            Divider()
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Calving Notes")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(notes)
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                            }
+                        }
+
+                        // Link to full calving record
+                        Divider()
+                        NavigationLink(destination: CalvingDetailView(calvingRecord: calving)) {
+                            HStack {
+                                Text("View Full Calving Record")
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
 
@@ -346,6 +498,12 @@ struct PregnancyDetailView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         return formatter.string(from: date)
+    }
+
+    private func daysSinceCalving(_ calvingDate: Date) -> Int? {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.day], from: calvingDate, to: Date())
+        return components.day
     }
 }
 

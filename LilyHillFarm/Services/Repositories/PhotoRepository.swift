@@ -178,10 +178,11 @@ class PhotoRepository: BaseSyncManager {
         }
 
         // Refetch the photo to ensure all relationships are loaded
+        let photoIdCopy = photoId
         let refreshedPhoto = try await context.perform { [weak self] in
             guard let self = self else { return photo }
             let fetchRequest: NSFetchRequest<Photo> = Photo.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "id == %@", photoId as CVarArg)
+            fetchRequest.predicate = NSPredicate(format: "id == %@", photoIdCopy as CVarArg)
             fetchRequest.relationshipKeyPathsForPrefetching = ["cattle", "healthRecord"]
 
             if let fetched = try self.context.fetch(fetchRequest).first {
@@ -246,8 +247,9 @@ class PhotoRepository: BaseSyncManager {
             print("   ✅ Image uploaded to Storage")
 
             // Update photo record with the storage path
+            let filePathCopy = filePath
             await context.perform {
-                photo.imageAssetPath = filePath
+                photo.imageAssetPath = filePathCopy
             }
 
             // Save the updated path

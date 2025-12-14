@@ -12,7 +12,7 @@ struct HealthRecordListView: View {
     @ObservedObject var cattle: Cattle
     @Environment(\.managedObjectContext) private var viewContext
     @State private var showingAddRecord = false
-    @State private var selectedRecordType: HealthRecordType? = nil
+    @State private var selectedRecordType: LegacyHealthRecordType? = nil
     @State private var recordToNavigateTo: HealthRecord?
     @State private var navigateToDetail = false
 
@@ -74,7 +74,7 @@ struct HealthRecordListView: View {
                         action: { selectedRecordType = nil }
                     )
 
-                    ForEach(HealthRecordType.allCases) { type in
+                    ForEach(LegacyHealthRecordType.allCases) { type in
                         FilterChip(
                             title: type.rawValue,
                             isSelected: selectedRecordType == type,
@@ -139,15 +139,11 @@ struct HealthRecordListView: View {
                 }
             }
         }
-        .background(
-            NavigationLink(
-                destination: recordToNavigateTo.map { HealthRecordDetailView(record: $0) },
-                isActive: $navigateToDetail
-            ) {
-                EmptyView()
+        .navigationDestination(isPresented: $navigateToDetail) {
+            if let record = recordToNavigateTo {
+                HealthRecordDetailView(record: record)
             }
-            .hidden()
-        )
+        }
     }
 
     // MARK: - Delete

@@ -24,14 +24,33 @@ struct AddHealthRecordView: View {
     // Optional callback when record is saved successfully
     var onRecordSaved: ((HealthRecord) -> Void)?
 
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \HealthRecordType.name, ascending: true)],
+        predicate: NSPredicate(format: "isActive == YES AND deletedAt == nil"),
+        animation: .default)
+    private var healthRecordTypes: FetchedResults<HealthRecordType>
+
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Medication.name, ascending: true)],
+        predicate: NSPredicate(format: "isActive == YES AND deletedAt == nil"),
+        animation: .default)
+    private var medications: FetchedResults<Medication>
+
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Veterinarian.name, ascending: true)],
+        predicate: NSPredicate(format: "isActive == YES AND deletedAt == nil"),
+        animation: .default)
+    private var veterinarians: FetchedResults<Veterinarian>
+
     // Record details
-    @State private var recordType: HealthRecordType = .checkup
+    @State private var selectedRecordType: HealthRecordType?
     @State private var date = Date()
     @State private var selectedCondition: HealthConditionItem?
     @State private var treatment = ""
-    @State private var medication = ""
+    @State private var selectedMedications: Set<Medication> = []
+    @State private var showMedicationPicker = false
     @State private var dosage = ""
-    @State private var veterinarian = ""
+    @State private var selectedVeterinarian: Veterinarian?
     @State private var notes = ""
 
     // Cost
@@ -149,9 +168,10 @@ struct AddHealthRecordView: View {
 
     private var basicInfoSection: some View {
         Section("Record Information") {
-            Picker("Type *", selection: $recordType) {
-                ForEach(HealthRecordType.allCases) { type in
-                    Text(type.rawValue).tag(type)
+            Picker("Type *", selection: $selectedRecordType) {
+                Text("Select Type").tag(nil as HealthRecordType?)
+                ForEach(healthRecordTypes) { type in
+                    Text(type.displayValue).tag(type as HealthRecordType?)
                 }
             }
 
@@ -258,9 +278,30 @@ struct AddHealthRecordView: View {
     private var treatmentSection: some View {
         Section("Treatment") {
             TextField("Treatment", text: $treatment)
-            TextField("Medication", text: $medication)
+
+            MultiSelectDisplay(
+                selectedItems: selectedMedications,
+                itemLabel: { $0.displayValue },
+                placeholder: "Select medications",
+                onTap: { showMedicationPicker = true }
+            )
+
             TextField("Dosage", text: $dosage)
-            TextField("Veterinarian", text: $veterinarian)
+
+            Picker("Veterinarian", selection: $selectedVeterinarian) {
+                Text("Select...").tag(nil as Veterinarian?)
+                ForEach(veterinarians) { vet in
+                    Text(vet.displayValue).tag(vet as Veterinarian?)
+                }
+            }
+        }
+        .sheet(isPresented: $showMedicationPicker) {
+            MultiSelectPicker(
+                title: "Select Medications",
+                items: Array(medications),
+                selectedItems: $selectedMedications,
+                itemLabel: { $0.displayValue }
+            )
         }
     }
 
@@ -379,14 +420,31 @@ struct AddHealthRecordView: View {
     // MARK: - Save
 
     private func saveRecord() {
-        let record = HealthRecord.create(for: cattle, type: recordType, in: viewContext)
+        // Create record with default type (will be overridden below with dynamic type)
+        let record = HealthRecord.create(for: cattle, type: .checkup, in: viewContext)
 
         record.date = date
         record.condition = selectedCondition?.name
+
+        // Save record type ID and name from dynamic lookup
+        record.recordTypeId = selectedRecordType?.id
+        record.recordType = selectedRecordType?.name
+
         record.treatment = treatment.isEmpty ? nil : treatment
-        record.medication = medication.isEmpty ? nil : medication
+
+        // Save medications as comma-separated names (for backward compatibility)
+        // and as UUID array (for future use)
+        if !selectedMedications.isEmpty {
+            record.medication = selectedMedications.map { $0.name ?? "Unknown" }.joined(separator: ", ")
+            record.medicationIds = selectedMedications.toUUIDArray() as NSArray
+        }
+
         record.dosage = dosage.isEmpty ? nil : dosage
-        record.veterinarian = veterinarian.isEmpty ? nil : veterinarian
+
+        // Save veterinarian ID and name
+        record.veterinarianId = selectedVeterinarian?.id
+        record.veterinarian = selectedVeterinarian?.name
+
         record.notes = notes.isEmpty ? nil : notes
 
         // Cost
@@ -541,10 +599,10 @@ struct AddHealthRecordView: View {
                     print("  - Treatment: \(title)")
                 }
 
-                // Populate medication field
-                if let med = firstStep.medication, !med.isEmpty, medication.isEmpty {
-                    medication = med
-                    print("  - Medication: \(med)")
+                // Populate medication field (note: medications are stored in selectedMedications Set)
+                if let med = firstStep.medication, !med.isEmpty {
+                    // Could parse medication string and match to Medication entities if needed
+                    print("  - Medication from plan: \(med)")
                 }
 
                 // Populate dosage field
@@ -635,7 +693,8 @@ struct AddHealthRecordView: View {
                 }
 
                 // Use step-specific medication/dosage if available, otherwise use health record values
-                let stepMedication = step.medication ?? medication
+                let medicationString = selectedMedications.map { $0.name ?? "Unknown" }.joined(separator: ", ")
+                let stepMedication = step.medication ?? medicationString
                 let stepDosage = step.dosage ?? dosage
 
                 if !stepMedication.isEmpty {

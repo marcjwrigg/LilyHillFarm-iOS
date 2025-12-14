@@ -105,8 +105,8 @@ class DemoDataGenerator {
             bull.color = "Black"
             bull.dateOfBirth = Calendar.current.date(byAdding: .year, value: -(2 + (i % 5)), to: Date())
             bull.currentStatus = CattleStatus.active.rawValue
-            bull.currentStage = CattleStage.breeding.rawValue
-            bull.productionPath = ProductionPath.breeding.rawValue
+            bull.currentStage = LegacyCattleStage.breeding.rawValue
+            bull.productionPath = LegacyProductionPath.breeding.rawValue
             bull.currentWeight = NSDecimalNumber(decimal: Decimal(1800 + (i * 50)))
             bull.createdAt = Date()
             bull.modifiedAt = Date()
@@ -133,8 +133,8 @@ class DemoDataGenerator {
             cow.color = "Black"
             cow.dateOfBirth = Calendar.current.date(byAdding: .year, value: -(2 + (i % 6)), to: Date())
             cow.currentStatus = CattleStatus.active.rawValue
-            cow.currentStage = CattleStage.breeding.rawValue
-            cow.productionPath = ProductionPath.breeding.rawValue
+            cow.currentStage = LegacyCattleStage.breeding.rawValue
+            cow.productionPath = LegacyProductionPath.breeding.rawValue
             cow.currentWeight = NSDecimalNumber(decimal: Decimal(1200 + (i * 20)))
             cow.createdAt = Date()
             cow.modifiedAt = Date()
@@ -157,8 +157,8 @@ class DemoDataGenerator {
             calf.color = "Black"
             calf.dateOfBirth = Calendar.current.date(byAdding: .month, value: -(1 + (i % 4)), to: Date())
             calf.currentStatus = CattleStatus.active.rawValue
-            calf.currentStage = CattleStage.calf.rawValue
-            calf.productionPath = i % 3 == 0 ? ProductionPath.breeding.rawValue : ProductionPath.beefFinishing.rawValue
+            calf.currentStage = LegacyCattleStage.calf.rawValue
+            calf.productionPath = i % 3 == 0 ? LegacyProductionPath.breeding.rawValue : LegacyProductionPath.beefFinishing.rawValue
             calf.currentWeight = NSDecimalNumber(decimal: Decimal(200 + (i * 15)))
             calf.createdAt = Date()
             calf.modifiedAt = Date()
@@ -187,8 +187,8 @@ class DemoDataGenerator {
             weanling.color = "Black"
             weanling.dateOfBirth = Calendar.current.date(byAdding: .month, value: -(7 + (i % 3)), to: Date())
             weanling.currentStatus = CattleStatus.active.rawValue
-            weanling.currentStage = CattleStage.weanling.rawValue
-            weanling.productionPath = i % 3 == 0 ? ProductionPath.breeding.rawValue : ProductionPath.beefFinishing.rawValue
+            weanling.currentStage = LegacyCattleStage.weanling.rawValue
+            weanling.productionPath = i % 3 == 0 ? LegacyProductionPath.breeding.rawValue : LegacyProductionPath.beefFinishing.rawValue
             weanling.currentWeight = NSDecimalNumber(decimal: Decimal(450 + (i * 25)))
             weanling.createdAt = Date()
             weanling.modifiedAt = Date()
@@ -216,8 +216,8 @@ class DemoDataGenerator {
             feeder.color = "Black"
             feeder.dateOfBirth = Calendar.current.date(byAdding: .month, value: -(12 + (i % 6)), to: Date())
             feeder.currentStatus = CattleStatus.active.rawValue
-            feeder.currentStage = CattleStage.feeder.rawValue
-            feeder.productionPath = ProductionPath.beefFinishing.rawValue
+            feeder.currentStage = LegacyCattleStage.feeder.rawValue
+            feeder.productionPath = LegacyProductionPath.beefFinishing.rawValue
             feeder.currentWeight = NSDecimalNumber(decimal: Decimal(800 + (i * 40)))
             feeder.createdAt = Date()
             feeder.modifiedAt = Date()
@@ -245,8 +245,8 @@ class DemoDataGenerator {
             heifer.color = "Black"
             heifer.dateOfBirth = Calendar.current.date(byAdding: .month, value: -(15 + (i % 6)), to: Date())
             heifer.currentStatus = CattleStatus.active.rawValue
-            heifer.currentStage = CattleStage.breeding.rawValue
-            heifer.productionPath = ProductionPath.breeding.rawValue
+            heifer.currentStage = LegacyCattleStage.breeding.rawValue
+            heifer.productionPath = LegacyProductionPath.breeding.rawValue
             heifer.currentWeight = NSDecimalNumber(decimal: Decimal(900 + (i * 35)))
             heifer.createdAt = Date()
             heifer.modifiedAt = Date()
@@ -274,8 +274,8 @@ class DemoDataGenerator {
             animal.color = "Black"
             animal.dateOfBirth = Calendar.current.date(byAdding: .month, value: -(18 + (i % 8)), to: Date())
             animal.currentStatus = CattleStatus.processed.rawValue
-            animal.currentStage = CattleStage.processed.rawValue
-            animal.productionPath = ProductionPath.beefFinishing.rawValue
+            animal.currentStage = LegacyCattleStage.processed.rawValue
+            animal.productionPath = LegacyProductionPath.beefFinishing.rawValue
             animal.currentWeight = NSDecimalNumber(decimal: Decimal(1100 + (i * 50)))
             animal.processingDate = Calendar.current.date(byAdding: .day, value: -(30 + i * 7), to: Date())
             animal.exitDate = animal.processingDate
@@ -306,8 +306,8 @@ class DemoDataGenerator {
             animal.color = "Black"
             animal.dateOfBirth = Calendar.current.date(byAdding: .month, value: -(14 + (i % 10)), to: Date())
             animal.currentStatus = CattleStatus.sold.rawValue
-            animal.currentStage = i % 3 == 0 ? CattleStage.feeder.rawValue : CattleStage.weanling.rawValue
-            animal.productionPath = ProductionPath.beefFinishing.rawValue
+            animal.currentStage = i % 3 == 0 ? LegacyCattleStage.feeder.rawValue : LegacyCattleStage.weanling.rawValue
+            animal.productionPath = LegacyProductionPath.beefFinishing.rawValue
             animal.currentWeight = NSDecimalNumber(decimal: Decimal(850 + (i * 40)))
             animal.exitDate = Calendar.current.date(byAdding: .day, value: -(15 + i * 5), to: Date())
             animal.exitReason = "Sold"
@@ -338,8 +338,8 @@ class DemoDataGenerator {
             animal.color = "Black"
             animal.dateOfBirth = Calendar.current.date(byAdding: .month, value: -(12 + (i % 20)), to: Date())
             animal.currentStatus = CattleStatus.deceased.rawValue
-            animal.currentStage = [CattleStage.calf, CattleStage.weanling, CattleStage.stocker, CattleStage.feeder, CattleStage.breeding].randomElement()!.rawValue
-            animal.productionPath = i % 2 == 0 ? ProductionPath.breeding.rawValue : ProductionPath.beefFinishing.rawValue
+            animal.currentStage = [LegacyCattleStage.calf, LegacyCattleStage.weanling, LegacyCattleStage.stocker, LegacyCattleStage.feeder, LegacyCattleStage.breeding].randomElement()!.rawValue
+            animal.productionPath = i % 2 == 0 ? LegacyProductionPath.breeding.rawValue : LegacyProductionPath.beefFinishing.rawValue
             animal.currentWeight = NSDecimalNumber(decimal: Decimal(400 + (i * 100)))
             animal.exitDate = Calendar.current.date(byAdding: .day, value: -(60 + i * 10), to: Date())
             animal.exitReason = "Deceased"
@@ -360,7 +360,7 @@ class DemoDataGenerator {
     // MARK: - Health Records
 
     private func addHealthRecords(to cattle: [Cattle], count: Int) {
-        let recordTypes: [HealthRecordType] = [.checkup, .vaccination, .treatment, .injury, .illness]
+        let recordTypes: [LegacyHealthRecordType] = [.checkup, .vaccination, .treatment, .injury, .illness]
         let conditions = [
             "Routine checkup - healthy",
             "Annual vaccination",
@@ -497,9 +497,9 @@ class DemoDataGenerator {
     // MARK: - Sale Records
 
     private func addSaleRecords(to cattle: [Cattle]) {
-        let buyers = ["Smith Ranch", "Johnson Cattle Co.", "Valley Farm", "Local Livestock Market", "Private Buyer"]
-        let marketTypes = ["Private Sale", "Auction", "Direct Sale"]
-        let paymentMethods = ["Cash", "Check", "Bank Transfer"]
+        _ = ["Smith Ranch", "Johnson Cattle Co.", "Valley Farm", "Local Livestock Market", "Private Buyer"]
+        _ = ["Private Sale", "Auction", "Direct Sale"]
+        _ = ["Cash", "Check", "Bank Transfer"]
 
         for animal in cattle {
             guard let saleDate = animal.exitDate else { continue }

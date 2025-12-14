@@ -10,9 +10,10 @@ internal import CoreData
 
 struct HealthDashboardView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @State private var showingCattlePicker = false
-    @State private var selectedCattle: Cattle?
-    @State private var showingAddRecord = false
+
+    @State private var isFollowUpExpanded = true
+    @State private var isWorstOffendersExpanded = true
+    @State private var isRecentRecordsExpanded = true
 
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Cattle.tagNumber, ascending: true)],
@@ -52,9 +53,9 @@ struct HealthDashboardView: View {
     var worstOffenders: [(Cattle, Int)] {
         let cattleWithTreatments = activeCattle.compactMap { cattle -> (Cattle, Int)? in
             let treatmentCount = cattle.sortedHealthRecords.filter {
-                $0.recordType == HealthRecordType.treatment.rawValue ||
-                $0.recordType == HealthRecordType.injury.rawValue ||
-                $0.recordType == HealthRecordType.illness.rawValue
+                $0.recordType == LegacyHealthRecordType.treatment.rawValue ||
+                $0.recordType == LegacyHealthRecordType.injury.rawValue ||
+                $0.recordType == LegacyHealthRecordType.illness.rawValue
             }.count
             return treatmentCount > 0 ? (cattle, treatmentCount) : nil
         }
@@ -136,27 +137,12 @@ struct HealthDashboardView: View {
             #endif
         }
         .navigationTitle("Health Dashboard")
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button(action: { showingCattlePicker = true }) {
-                    Label("Add Record", systemImage: "plus")
-                }
-            }
-        }
-        .sheet(isPresented: $showingCattlePicker) {
-            CattlePickerView(selectedCattle: $selectedCattle, showingAddRecord: $showingAddRecord)
-        }
-        .sheet(isPresented: $showingAddRecord) {
-            if let cattle = selectedCattle {
-                AddHealthRecordView(cattle: cattle)
-            }
-        }
     }
 
     // MARK: - Follow-up Required Card
 
     private var followUpRequiredCard: some View {
-        InfoCard(title: "Follow-up Required", subtitle: "Health records requiring follow-up treatment") {
+        InfoCard(title: "Follow-up Required", subtitle: "Health records requiring follow-up treatment", isExpanded: $isFollowUpExpanded) {
             if allFollowUpRecords.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "checkmark.circle")
@@ -229,7 +215,7 @@ struct HealthDashboardView: View {
     // MARK: - Worst Offenders Card
 
     private var worstOffendersCard: some View {
-        InfoCard(title: "Worst Offenders", subtitle: "Animals with most treatments/injuries") {
+        InfoCard(title: "Worst Offenders", subtitle: "Animals with most treatments/injuries", isExpanded: $isWorstOffendersExpanded) {
             if worstOffenders.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "heart.text.square")
@@ -286,7 +272,7 @@ struct HealthDashboardView: View {
     // MARK: - Recent Health Records Card
 
     private var recentHealthRecordsCard: some View {
-        InfoCard(title: "Recent Health Records", subtitle: "Latest medical history and treatments") {
+        InfoCard(title: "Recent Health Records", subtitle: "Latest medical history and treatments", isExpanded: $isRecentRecordsExpanded) {
             if allHealthRecords.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "heart.text.square")
@@ -441,7 +427,7 @@ struct HealthDashboardView: View {
         let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date())!
         return allHealthRecords.filter {
             guard let date = $0.date else { return false }
-            return date >= thirtyDaysAgo && $0.recordType == HealthRecordType.vaccination.rawValue
+            return date >= thirtyDaysAgo && $0.recordType == LegacyHealthRecordType.vaccination.rawValue
         }.count
     }
 
@@ -449,7 +435,7 @@ struct HealthDashboardView: View {
         let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date())!
         return allHealthRecords.filter {
             guard let date = $0.date else { return false }
-            return date >= thirtyDaysAgo && $0.recordType == HealthRecordType.treatment.rawValue
+            return date >= thirtyDaysAgo && $0.recordType == LegacyHealthRecordType.treatment.rawValue
         }.count
     }
 }

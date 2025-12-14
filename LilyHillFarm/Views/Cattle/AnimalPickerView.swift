@@ -97,7 +97,7 @@ struct AnimalPickerView: View {
                     let cattle = Cattle.create(in: context)
                     cattle.tagNumber = "A\(100 + i)"
                     cattle.name = "Animal \(i + 1)"
-                    cattle.currentStage = CattleStage.allCases.randomElement()?.rawValue
+                    cattle.currentStage = LegacyCattleStage.allCases.randomElement()?.rawValue
                     cattle.sex = CattleSex.allCases.randomElement()?.rawValue
                     return cattle
                 }

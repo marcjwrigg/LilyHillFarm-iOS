@@ -128,23 +128,27 @@ class ContactRepository: BaseSyncManager {
         var contactDTOs = try await fetchAll()
         print("✅ Fetched \(contactDTOs.count) contacts from Supabase")
 
-        // Fetch related data for all contacts
+        // Fetch related data for all contacts in bulk (much faster)
         print("🔄 Fetching related contact data...")
+        let contactIds = contactDTOs.map { $0.id }
+
+        // Fetch all phone numbers, emails, and persons in 3 queries instead of N+1
+        let allPhoneNumbers = try await fetchPhoneNumbersForContacts(contactIds)
+        let allEmails = try await fetchEmailsForContacts(contactIds)
+        let allPersons = try await fetchContactPersonsForContacts(contactIds)
+
+        // Group by contact_id for fast lookup
+        let phonesByContact = Dictionary(grouping: allPhoneNumbers, by: { $0.contactId })
+        let emailsByContact = Dictionary(grouping: allEmails, by: { $0.contactId })
+        let personsByContact = Dictionary(grouping: allPersons, by: { $0.businessContactId })
+
+        // Assign to DTOs
         for i in 0..<contactDTOs.count {
             let contactId = contactDTOs[i].id
-
-            // Fetch phone numbers
-            let phoneNumbers = try await fetchPhoneNumbers(for: contactId)
-            contactDTOs[i].phoneNumbers = phoneNumbers
-
-            // Fetch emails
-            let emails = try await fetchEmails(for: contactId)
-            contactDTOs[i].emails = emails
-
-            // Fetch contact persons (if business)
+            contactDTOs[i].phoneNumbers = phonesByContact[contactId] ?? []
+            contactDTOs[i].emails = emailsByContact[contactId] ?? []
             if contactDTOs[i].isBusiness {
-                let persons = try await fetchContactPersons(for: contactId)
-                contactDTOs[i].contactPersons = persons
+                contactDTOs[i].contactPersons = personsByContact[contactId] ?? []
             }
         }
         print("✅ Fetched all related contact data")
@@ -187,15 +191,20 @@ class ContactRepository: BaseSyncManager {
                 }
             }
 
-            print("💾 Saving contacts to Core Data...")
-            try self.saveContext()
-            print("✅ Contacts sync completed!")
+            // Only save if there are actual changes
+            if self.context.hasChanges {
+                print("💾 Saving contacts to Core Data...")
+                try self.saveContext()
+                print("✅ Contacts sync completed!")
+            } else {
+                print("✅ Contacts sync completed (no changes needed)")
+            }
         }
     }
 
     // MARK: - Fetch Related Data
 
-    private func fetchPhoneNumbers(for contactId: UUID) async throws -> [ContactPhoneNumberDTO] {
+    func fetchPhoneNumbers(for contactId: UUID) async throws -> [ContactPhoneNumberDTO] {
         let data = try await supabase.client
             .from("contact_phone_numbers")
             .select()
@@ -206,7 +215,7 @@ class ContactRepository: BaseSyncManager {
         return try JSONDecoder().decode([ContactPhoneNumberDTO].self, from: data)
     }
 
-    private func fetchEmails(for contactId: UUID) async throws -> [ContactEmailDTO] {
+    func fetchEmails(for contactId: UUID) async throws -> [ContactEmailDTO] {
         let data = try await supabase.client
             .from("contact_emails")
             .select()
@@ -217,11 +226,53 @@ class ContactRepository: BaseSyncManager {
         return try JSONDecoder().decode([ContactEmailDTO].self, from: data)
     }
 
-    private func fetchContactPersons(for contactId: UUID) async throws -> [ContactPersonDTO] {
+    func fetchContactPersons(for contactId: UUID) async throws -> [ContactPersonDTO] {
         let data = try await supabase.client
             .from("contact_persons")
             .select()
             .eq("business_contact_id", value: contactId.uuidString)
+            .execute()
+            .data
+
+        return try JSONDecoder().decode([ContactPersonDTO].self, from: data)
+    }
+
+    // MARK: - Bulk Fetch Methods (for performance)
+
+    private func fetchPhoneNumbersForContacts(_ contactIds: [UUID]) async throws -> [ContactPhoneNumberDTO] {
+        guard !contactIds.isEmpty else { return [] }
+
+        let idsString = contactIds.map { $0.uuidString }.joined(separator: ",")
+        let data = try await supabase.client
+            .from("contact_phone_numbers")
+            .select()
+            .in("contact_id", values: contactIds.map { $0.uuidString })
+            .execute()
+            .data
+
+        return try JSONDecoder().decode([ContactPhoneNumberDTO].self, from: data)
+    }
+
+    private func fetchEmailsForContacts(_ contactIds: [UUID]) async throws -> [ContactEmailDTO] {
+        guard !contactIds.isEmpty else { return [] }
+
+        let data = try await supabase.client
+            .from("contact_emails")
+            .select()
+            .in("contact_id", values: contactIds.map { $0.uuidString })
+            .execute()
+            .data
+
+        return try JSONDecoder().decode([ContactEmailDTO].self, from: data)
+    }
+
+    private func fetchContactPersonsForContacts(_ contactIds: [UUID]) async throws -> [ContactPersonDTO] {
+        guard !contactIds.isEmpty else { return [] }
+
+        let data = try await supabase.client
+            .from("contact_persons")
+            .select()
+            .in("business_contact_id", values: contactIds.map { $0.uuidString })
             .execute()
             .data
 
@@ -233,7 +284,6 @@ class ContactRepository: BaseSyncManager {
     private func syncPhoneNumbers(_ dtos: [ContactPhoneNumberDTO], for contact: Contact) {
         // Get existing phone numbers
         let existingPhoneNumbers = (contact.phoneNumbers as? Set<ContactPhoneNumber>) ?? []
-        let existingIds = Set(existingPhoneNumbers.compactMap { $0.id })
         let dtoIds = Set(dtos.map { $0.id })
 
         // Remove phone numbers that no longer exist
@@ -257,7 +307,6 @@ class ContactRepository: BaseSyncManager {
     private func syncEmails(_ dtos: [ContactEmailDTO], for contact: Contact) {
         // Get existing emails
         let existingEmails = (contact.emails as? Set<ContactEmail>) ?? []
-        let existingIds = Set(existingEmails.compactMap { $0.id })
         let dtoIds = Set(dtos.map { $0.id })
 
         // Remove emails that no longer exist
@@ -281,7 +330,6 @@ class ContactRepository: BaseSyncManager {
     private func syncContactPersons(_ dtos: [ContactPersonDTO], for contact: Contact) {
         // Get existing contact persons
         let existingPersons = (contact.contactPersons as? Set<ContactPerson>) ?? []
-        let existingIds = Set(existingPersons.compactMap { $0.id })
         let dtoIds = Set(dtos.map { $0.id })
 
         // Remove persons that no longer exist

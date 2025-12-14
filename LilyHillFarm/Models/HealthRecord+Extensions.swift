@@ -52,7 +52,7 @@ extension HealthRecord {
     }
 
     var typeIcon: String {
-        guard let type = HealthRecordType(rawValue: recordType ?? "") else {
+        guard let type = LegacyHealthRecordType(rawValue: recordType ?? "") else {
             return "heart.text.square"
         }
 
@@ -78,7 +78,7 @@ extension HealthRecord {
 
     // MARK: - Factory Methods
 
-    static func create(for cattle: Cattle, type: HealthRecordType, in context: NSManagedObjectContext) -> HealthRecord {
+    static func create(for cattle: Cattle, type: LegacyHealthRecordType, in context: NSManagedObjectContext) -> HealthRecord {
         let record = HealthRecord(context: context)
         record.id = UUID()
         record.cattle = cattle

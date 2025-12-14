@@ -21,6 +21,12 @@ struct BreedingDashboardView: View {
         animation: .default)
     private var activeCattle: FetchedResults<Cattle>
 
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Cattle.tagNumber, ascending: true)],
+        predicate: NSPredicate(format: "deletedAt == nil"),
+        animation: .default)
+    private var allCattle: FetchedResults<Cattle>
+
     var allPregnancies: [PregnancyRecord] {
         activeCattle.flatMap { $0.sortedPregnancyRecords }
             .sorted { ($0.breedingDate ?? Date.distantPast) > ($1.breedingDate ?? Date.distantPast) }
@@ -44,6 +50,16 @@ struct BreedingDashboardView: View {
             return nil
         }
 
+        // Helper function to check if pregnancy is truly overdue (past END date)
+        func isOverdue(_ pregnancy: PregnancyRecord) -> Bool {
+            if let calvingEnd = pregnancy.expectedCalvingEndDate {
+                return Date() > calvingEnd
+            } else if let calvingDate = pregnancy.expectedCalvingDate {
+                return Date() > calvingDate
+            }
+            return false
+        }
+
         // Filter by selected days if applicable
         let filtered: [PregnancyRecord]
         if let daysFilter = selectedDaysFilter {
@@ -58,11 +74,16 @@ struct BreedingDashboardView: View {
 
         // Sort by earliest calving date (closest first)
         return filtered.sorted {
+            let overdue0 = isOverdue($0)
+            let overdue1 = isOverdue($1)
+
+            // Truly overdue pregnancies come first
+            if overdue0 && !overdue1 { return true }
+            if !overdue0 && overdue1 { return false }
+
+            // Otherwise sort by earliest calving date
             let days0 = getEarliestCalvingDays($0) ?? Int.max
             let days1 = getEarliestCalvingDays($1) ?? Int.max
-            // Handle negative days (overdue) - they should come first
-            if days0 < 0 && days1 >= 0 { return true }
-            if days0 >= 0 && days1 < 0 { return false }
             return abs(days0) < abs(days1)
         }
     }
@@ -128,10 +149,11 @@ struct BreedingDashboardView: View {
     }
 
     var calvingsThisYear: Int {
-        let startOfYear = Calendar.current.date(from: Calendar.current.dateComponents([.year], from: Date()))!
+        let currentYear = Calendar.current.component(.year, from: Date())
         return allCalvingRecords.filter {
             guard let date = $0.calvingDate else { return false }
-            return date >= startOfYear
+            let year = Calendar.current.component(.year, from: date)
+            return year == currentYear
         }.count
     }
 
@@ -146,21 +168,29 @@ struct BreedingDashboardView: View {
     var avgDaysPostPartum: Int? {
         var intervals: [Int] = []
 
-        for cattle in breedableCattle {
-            let calvings = cattle.sortedCalvingRecords
-            let pregnancies = cattle.sortedPregnancyRecords.sorted {
-                ($0.breedingDate ?? Date.distantPast) < ($1.breedingDate ?? Date.distantPast)
+        // Materialize the cattle array to avoid threading issues
+        let cattleArray = Array(breedableCattle)
+
+        for cattle in cattleArray {
+            // Materialize relationships to arrays before iterating
+            let calvings = Array(cattle.sortedCalvingRecords)
+            let pregnancies = Array(cattle.sortedPregnancyRecords).sorted {
+                let date0 = $0.breedingDate ?? $0.breedingStartDate ?? Date.distantPast
+                let date1 = $1.breedingDate ?? $1.breedingStartDate ?? Date.distantPast
+                return date0 < date1
             }
 
             for calving in calvings {
                 guard let calvingDate = calving.calvingDate else { continue }
 
-                // Find first pregnancy where breeding date is after this calving date
+                // Find first pregnancy where breeding date (or breeding_start_date) is after this calving date
                 if let nextBreeding = pregnancies.first(where: { pregnancy in
-                    guard let breedingDate = pregnancy.breedingDate else { return false }
-                    return breedingDate > calvingDate
+                    let breedingDate = pregnancy.breedingDate ?? pregnancy.breedingStartDate
+                    guard let date = breedingDate else { return false }
+                    return date > calvingDate
                 }) {
-                    let days = Calendar.current.dateComponents([.day], from: calvingDate, to: nextBreeding.breedingDate!).day ?? 0
+                    let breedingDate = nextBreeding.breedingDate ?? nextBreeding.breedingStartDate!
+                    let days = Calendar.current.dateComponents([.day], from: calvingDate, to: breedingDate).day ?? 0
                     if days > 0 && days < 365 { // Sanity check
                         intervals.append(days)
                     }
@@ -169,15 +199,23 @@ struct BreedingDashboardView: View {
         }
 
         guard !intervals.isEmpty else { return nil }
-        return intervals.reduce(0, +) / intervals.count
+        let average = Double(intervals.reduce(0, +)) / Double(intervals.count)
+        return Int(average.rounded())
     }
 
     var avgDaysBetweenCalving: Int? {
         var intervals: [Int] = []
 
-        for cattle in breedableCattle {
-            let calvings = cattle.sortedCalvingRecords.reversed() // Oldest first
+        // Materialize the cattle array to avoid threading issues
+        let cattleArray = Array(breedableCattle)
+
+        for cattle in cattleArray {
+            // Materialize the relationship to an array first, then reverse and extract dates
+            let calvings = Array(cattle.sortedCalvingRecords).reversed()
                 .compactMap { $0.calvingDate }
+
+            // Need at least 2 calvings to calculate intervals
+            guard calvings.count > 1 else { continue }
 
             for i in 1..<calvings.count {
                 let days = Calendar.current.dateComponents([.day], from: calvings[i-1], to: calvings[i]).day ?? 0
@@ -188,12 +226,38 @@ struct BreedingDashboardView: View {
         }
 
         guard !intervals.isEmpty else { return nil }
-        return intervals.reduce(0, +) / intervals.count
+        let average = Double(intervals.reduce(0, +)) / Double(intervals.count)
+        return Int(average.rounded())
     }
 
     var bullHeiferRatio: String {
-        let allOffspring = activeCattle.flatMap { cattle in
-            cattle.offspringArray + cattle.offspringAsSire
+        // Use ALL cattle (not just active) for all-time ratio - materialize to avoid threading issues
+        let cattleArray = Array(allCattle)
+
+        // Only include offspring with a dam_id (born on farm)
+        let allOffspring = cattleArray.filter { cattle in
+            cattle.dam != nil
+        }
+
+        let bulls = allOffspring.filter { $0.sex == CattleSex.bull.rawValue || $0.sex == CattleSex.steer.rawValue }.count
+        let heifers = allOffspring.filter { $0.sex == CattleSex.heifer.rawValue || $0.sex == CattleSex.cow.rawValue }.count
+
+        if heifers > 0 {
+            return "\(bulls):\(heifers)"
+        } else if bulls > 0 {
+            return "\(bulls):0"
+        } else {
+            return "—"
+        }
+    }
+
+    var bullHeiferRatioSimplified: String {
+        // Use ALL cattle (not just active) for all-time ratio - materialize to avoid threading issues
+        let cattleArray = Array(allCattle)
+
+        // Only include offspring with a dam_id (born on farm)
+        let allOffspring = cattleArray.filter { cattle in
+            cattle.dam != nil
         }
 
         let bulls = allOffspring.filter { $0.sex == CattleSex.bull.rawValue || $0.sex == CattleSex.steer.rawValue }.count
@@ -201,11 +265,11 @@ struct BreedingDashboardView: View {
 
         if heifers > 0 {
             let ratio = Double(bulls) / Double(heifers)
-            return "\(bulls):\(heifers) (\(String(format: "%.2f", ratio)):1)"
+            return "(\(String(format: "%.2f", ratio)):1)"
         } else if bulls > 0 {
-            return "\(bulls):0"
+            return "(\(bulls):0)"
         } else {
-            return "—"
+            return ""
         }
     }
 
@@ -266,12 +330,9 @@ struct BreedingDashboardView: View {
                             subtitle: "Calving interval"
                         )
 
-                        StatCard(
-                            title: "Bull:Heifer Ratio",
-                            value: bullHeiferRatio,
-                            icon: "chart.bar",
-                            color: .indigo,
-                            subtitle: "All-time offspring ratio"
+                        BullHeiferRatioCard(
+                            ratio: bullHeiferRatio,
+                            simplified: bullHeiferRatioSimplified
                         )
                     }
                     .padding(.horizontal)
@@ -624,6 +685,47 @@ struct BreedingDashboardView: View {
         default:
             return .gray
         }
+    }
+}
+
+// MARK: - Bull:Heifer Ratio Card
+
+struct BullHeiferRatioCard: View {
+    let ratio: String
+    let simplified: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "chart.bar")
+                    .foregroundColor(.indigo)
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(ratio)
+                    .font(.title)
+                    .fontWeight(.bold)
+                if !simplified.isEmpty {
+                    Text(simplified)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Text("Bull:Heifer Ratio")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            Text("All-time offspring ratio")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
 }
 
