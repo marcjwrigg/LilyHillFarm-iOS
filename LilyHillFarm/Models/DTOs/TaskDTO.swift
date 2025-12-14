@@ -19,11 +19,16 @@ struct TaskDTO: Codable {
     let status: String
     let dueDate: String?
     let assignedTo: UUID?
-    let cattleId: UUID?
+    let cattleIds: [UUID]?  // Database uses array, but iOS only supports single cattle for now
     let completedAt: String?
     let deletedAt: String?  // For soft delete sync
     let createdAt: String
     let updatedAt: String
+
+    // Convenience property for iOS which currently only supports one cattle per task
+    var cattleId: UUID? {
+        cattleIds?.first
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -36,7 +41,7 @@ struct TaskDTO: Codable {
         case status
         case dueDate = "due_date"
         case assignedTo = "assigned_to"
-        case cattleId = "cattle_id"
+        case cattleIds = "cattle_ids"
         case completedAt = "completed_at"
         case deletedAt = "deleted_at"
         case createdAt = "created_at"
@@ -55,7 +60,7 @@ struct TaskDTO: Codable {
         status: String,
         dueDate: String?,
         assignedTo: UUID?,
-        cattleId: UUID?,
+        cattleIds: [UUID]?,
         completedAt: String?,
         deletedAt: String?,
         createdAt: String,
@@ -71,7 +76,7 @@ struct TaskDTO: Codable {
         self.status = status
         self.dueDate = dueDate
         self.assignedTo = assignedTo
-        self.cattleId = cattleId
+        self.cattleIds = cattleIds
         self.completedAt = completedAt
         self.deletedAt = deletedAt
         self.createdAt = createdAt
@@ -95,7 +100,8 @@ extension TaskDTO {
         self.status = task.status ?? "pending"
         self.dueDate = task.dueDate?.toISO8601String()
         self.assignedTo = task.assignedToId
-        self.cattleId = task.cattle?.id
+        // Wrap single cattle ID in array for database (which expects UUID[])
+        self.cattleIds = task.cattle?.id.map { [$0] }
         self.completedAt = task.completedAt?.toISO8601String()
         self.deletedAt = task.deletedAt?.toISO8601String()
         self.createdAt = (task.createdAt ?? Date()).toISO8601String()
