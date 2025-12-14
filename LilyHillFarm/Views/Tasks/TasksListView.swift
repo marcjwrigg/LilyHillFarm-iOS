@@ -13,41 +13,39 @@ struct TasksListView: View {
     @State private var selectedFilter: TaskFilter = .open
 
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Filter Picker
-                Picker("Filter", selection: $selectedFilter) {
-                    ForEach(TaskFilter.allCases) { filter in
-                        Text(filter.rawValue).tag(filter)
-                    }
+        VStack(spacing: 0) {
+            // Filter Picker
+            Picker("Filter", selection: $selectedFilter) {
+                ForEach(TaskFilter.allCases) { filter in
+                    Text(filter.rawValue).tag(filter)
                 }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding()
+            }
+            .pickerStyle(SegmentedPickerStyle())
+            .padding()
 
-                // Task List
-                if viewModel.isLoading {
-                    ProgressView("Loading tasks...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if viewModel.filteredTasks(for: selectedFilter).isEmpty {
-                    emptyState
-                } else {
-                    tasksList
+            // Task List
+            if viewModel.isLoading {
+                ProgressView("Loading tasks...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if viewModel.filteredTasks(for: selectedFilter).isEmpty {
+                emptyState
+            } else {
+                tasksList
+            }
+        }
+        .navigationTitle("Tasks")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showingAddTask = true }) {
+                    Image(systemName: "plus")
                 }
             }
-            .navigationTitle("Tasks")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingAddTask = true }) {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
-            .sheet(isPresented: $showingAddTask) {
-                AddTaskView(viewModel: viewModel)
-            }
-            .task {
-                await viewModel.loadTasks()
-            }
+        }
+        .sheet(isPresented: $showingAddTask) {
+            AddTaskView(viewModel: viewModel)
+        }
+        .task {
+            await viewModel.loadTasks()
         }
     }
 
