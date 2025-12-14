@@ -43,20 +43,18 @@ class TasksViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
 
+        // Try to sync from Supabase, but don't fail if offline
         do {
-            // First, sync from Supabase to Core Data
             print("🔄 Syncing tasks from Supabase to Core Data")
             try await taskRepository.syncFromSupabase()
-
-            // Then load from Core Data
-            await loadTasksFromCoreData()
-
-            print("✅ Tasks loaded and synced successfully")
-
+            print("✅ Tasks synced from Supabase successfully")
         } catch {
-            print("❌ Failed to load tasks: \(error)")
-            errorMessage = error.localizedDescription
+            print("⚠️ Failed to sync tasks from Supabase (possibly offline): \(error)")
+            // Continue to load from Core Data even if sync fails
         }
+
+        // Always load from Core Data (works offline)
+        await loadTasksFromCoreData()
 
         isLoading = false
     }
