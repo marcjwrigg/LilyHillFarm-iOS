@@ -44,6 +44,10 @@ struct ChatView: View {
                         }
                         .padding()
                     }
+                    .onTapGesture {
+                        // Dismiss keyboard when tapping on messages
+                        isInputFocused = false
+                    }
                     .onChange(of: viewModel.messages.count) { _ in
                         withAnimation {
                             proxy.scrollTo(viewModel.messages.count - 1, anchor: .bottom)
@@ -64,13 +68,13 @@ struct ChatView: View {
                     selectedImages: $viewModel.selectedImages,
                     isLoading: viewModel.isLoading,
                     isListening: viewModel.voiceService.isListening,
+                    isInputFocused: $isInputFocused,
                     onSend: viewModel.sendMessage,
                     onAddImage: viewModel.addImage,
                     onRemoveImage: viewModel.removeImage,
                     onStartVoiceInput: viewModel.startVoiceInput,
                     onStopVoiceInput: { viewModel.stopVoiceInput() }
                 )
-                .focused($isInputFocused)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -192,6 +196,7 @@ struct ChatInputView: View {
     @Binding var selectedImages: [UIImage]
     let isLoading: Bool
     let isListening: Bool
+    var isInputFocused: FocusState<Bool>.Binding
     let onSend: () -> Void
     let onAddImage: (UIImage) -> Void
     let onRemoveImage: (Int) -> Void
@@ -275,6 +280,8 @@ struct ChatInputView: View {
 
                         // Speak button
                         Button {
+                            // Dismiss keyboard before starting voice input
+                            isInputFocused.wrappedValue = false
                             onStartVoiceInput()
                         } label: {
                             HStack(spacing: 6) {
@@ -300,6 +307,7 @@ struct ChatInputView: View {
                                 .cornerRadius(20)
                                 .lineLimit(1...6)
                                 .disabled(isLoading)
+                                .focused(isInputFocused)
                                 .onSubmit {
                                     onSend()
                                 }
