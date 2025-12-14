@@ -119,7 +119,7 @@ class TasksViewModel: ObservableObject {
             newTask.syncStatus = "pending"
 
             // Resolve cattle relationship if provided
-            if let cattleId = task.relatedCattleId {
+            if let cattleId = task.cattleId {
                 let cattleFetch: NSFetchRequest<Cattle> = Cattle.fetchRequest()
                 cattleFetch.predicate = NSPredicate(format: "id == %@", cattleId as CVarArg)
                 if let cattle = try? context.fetch(cattleFetch).first {
@@ -243,7 +243,7 @@ struct TaskItem: Identifiable {
     var priority: String
     var status: String
     var dueDate: Date?
-    var relatedCattleId: UUID?  // DB uses "related_cattle_id"
+    var cattleId: UUID?
     var cattleTag: String? // Mutable to allow setting from cattle lookup
     var completedAt: Date?
     let createdAt: Date
@@ -252,11 +252,6 @@ struct TaskItem: Identifiable {
     var taskType: String {
         get { category }
         set { category = newValue }
-    }
-
-    var cattleId: UUID? {
-        get { relatedCattleId }
-        set { relatedCattleId = newValue }
     }
 
     var isCompleted: Bool {
@@ -287,7 +282,7 @@ struct TaskItem: Identifiable {
         self.priority = priority
         self.status = status
         self.dueDate = dueDate
-        self.relatedCattleId = cattleId
+        self.cattleId = cattleId
         self.cattleTag = cattleTag
         self.completedAt = completedAt
         self.createdAt = createdAt
@@ -301,7 +296,7 @@ struct TaskItem: Identifiable {
         self.priority = dto.priority
         self.status = dto.status
         self.dueDate = dto.dueDate?.toDate()
-        self.relatedCattleId = dto.relatedCattleId
+        self.cattleId = dto.cattleId
         self.cattleTag = nil // Fetched separately
         self.completedAt = dto.completedAt?.toDate()
         self.createdAt = dto.createdAt.toDate() ?? Date()
@@ -315,7 +310,7 @@ struct TaskItem: Identifiable {
         self.priority = task.priority ?? "medium"
         self.status = task.status ?? "pending"
         self.dueDate = task.dueDate
-        self.relatedCattleId = task.cattle?.id
+        self.cattleId = task.cattle?.id
         self.cattleTag = task.cattle?.tagNumber
         self.completedAt = task.completedAt
         self.createdAt = task.createdAt ?? Date()

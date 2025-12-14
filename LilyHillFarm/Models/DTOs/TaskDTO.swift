@@ -10,6 +10,7 @@ import Foundation
 /// DTO for syncing task data with Supabase
 struct TaskDTO: Codable {
     let id: UUID
+    let userId: UUID
     let farmId: UUID?  // Optional since database migration may have NULL values
     let title: String
     let description: String?
@@ -17,8 +18,8 @@ struct TaskDTO: Codable {
     let priority: String
     let status: String
     let dueDate: String?
-    let assignedToUserId: UUID?
-    let relatedCattleId: UUID?
+    let assignedTo: UUID?
+    let cattleId: UUID?
     let completedAt: String?
     let deletedAt: String?  // For soft delete sync
     let createdAt: String
@@ -26,6 +27,7 @@ struct TaskDTO: Codable {
 
     enum CodingKeys: String, CodingKey {
         case id
+        case userId = "user_id"
         case farmId = "farm_id"
         case title
         case description
@@ -33,8 +35,8 @@ struct TaskDTO: Codable {
         case priority
         case status
         case dueDate = "due_date"
-        case assignedToUserId = "assigned_to_user_id"
-        case relatedCattleId = "related_cattle_id"
+        case assignedTo = "assigned_to"
+        case cattleId = "cattle_id"
         case completedAt = "completed_at"
         case deletedAt = "deleted_at"
         case createdAt = "created_at"
@@ -44,6 +46,7 @@ struct TaskDTO: Codable {
     // Memberwise initializer (required since we have a custom decoder)
     init(
         id: UUID,
+        userId: UUID,
         farmId: UUID?,
         title: String,
         description: String?,
@@ -51,14 +54,15 @@ struct TaskDTO: Codable {
         priority: String,
         status: String,
         dueDate: String?,
-        assignedToUserId: UUID?,
-        relatedCattleId: UUID?,
+        assignedTo: UUID?,
+        cattleId: UUID?,
         completedAt: String?,
         deletedAt: String?,
         createdAt: String,
         updatedAt: String
     ) {
         self.id = id
+        self.userId = userId
         self.farmId = farmId
         self.title = title
         self.description = description
@@ -66,8 +70,8 @@ struct TaskDTO: Codable {
         self.priority = priority
         self.status = status
         self.dueDate = dueDate
-        self.assignedToUserId = assignedToUserId
-        self.relatedCattleId = relatedCattleId
+        self.assignedTo = assignedTo
+        self.cattleId = cattleId
         self.completedAt = completedAt
         self.deletedAt = deletedAt
         self.createdAt = createdAt
@@ -80,8 +84,9 @@ struct TaskDTO: Codable {
 
 extension TaskDTO {
     /// Initialize from Core Data Task entity
-    init(from task: Task, farmId: UUID) {
+    init(from task: Task, farmId: UUID, userId: UUID) {
         self.id = task.id ?? UUID()
+        self.userId = userId
         self.farmId = farmId
         self.title = task.title ?? ""
         self.description = task.taskDescription
@@ -89,8 +94,8 @@ extension TaskDTO {
         self.priority = task.priority ?? "medium"
         self.status = task.status ?? "pending"
         self.dueDate = task.dueDate?.toISO8601String()
-        self.assignedToUserId = task.assignedToId
-        self.relatedCattleId = task.cattle?.id
+        self.assignedTo = task.assignedToId
+        self.cattleId = task.cattle?.id
         self.completedAt = task.completedAt?.toISO8601String()
         self.deletedAt = task.deletedAt?.toISO8601String()
         self.createdAt = (task.createdAt ?? Date()).toISO8601String()
@@ -108,7 +113,7 @@ extension TaskDTO {
         task.priority = self.priority
         task.status = self.status
         task.dueDate = self.dueDate?.toDate()
-        task.assignedToId = self.assignedToUserId
+        task.assignedToId = self.assignedTo
         task.completedAt = self.completedAt?.toDate()
         task.deletedAt = self.deletedAt?.toDate()
         task.createdAt = self.createdAt.toDate()

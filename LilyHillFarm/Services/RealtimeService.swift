@@ -1630,10 +1630,10 @@ class RealtimeService: ObservableObject {
                 print("   ⚠️ Task already exists, updating instead")
                 dto.update(existing)
 
-                // Resolve cattle relationship if related_cattle_id is present
-                if let relatedCattleId = dto.relatedCattleId {
+                // Resolve cattle relationship if cattle_id is present
+                if let cattleId = dto.cattleId {
                     let cattleFetch: NSFetchRequest<Cattle> = Cattle.fetchRequest()
-                    cattleFetch.predicate = NSPredicate(format: "id == %@", relatedCattleId as CVarArg)
+                    cattleFetch.predicate = NSPredicate(format: "id == %@", cattleId as CVarArg)
                     if let cattle = try? self.context.fetch(cattleFetch).first {
                         existing.cattle = cattle
                     }
@@ -1642,10 +1642,10 @@ class RealtimeService: ObservableObject {
                 let task = Task(context: self.context)
                 dto.update(task)
 
-                // Resolve cattle relationship if related_cattle_id is present
-                if let relatedCattleId = dto.relatedCattleId {
+                // Resolve cattle relationship if cattle_id is present
+                if let cattleId = dto.cattleId {
                     let cattleFetch: NSFetchRequest<Cattle> = Cattle.fetchRequest()
-                    cattleFetch.predicate = NSPredicate(format: "id == %@", relatedCattleId as CVarArg)
+                    cattleFetch.predicate = NSPredicate(format: "id == %@", cattleId as CVarArg)
                     if let cattle = try? self.context.fetch(cattleFetch).first {
                         task.cattle = cattle
                     }
@@ -1693,10 +1693,10 @@ class RealtimeService: ObservableObject {
                 let task = Task(context: self.context)
                 dto.update(task)
 
-                // Resolve cattle relationship if related_cattle_id is present
-                if let relatedCattleId = dto.relatedCattleId {
+                // Resolve cattle relationship if cattle_id is present
+                if let cattleId = dto.cattleId {
                     let cattleFetch: NSFetchRequest<Cattle> = Cattle.fetchRequest()
-                    cattleFetch.predicate = NSPredicate(format: "id == %@", relatedCattleId as CVarArg)
+                    cattleFetch.predicate = NSPredicate(format: "id == %@", cattleId as CVarArg)
                     if let cattle = try? self.context.fetch(cattleFetch).first {
                         task.cattle = cattle
                     }

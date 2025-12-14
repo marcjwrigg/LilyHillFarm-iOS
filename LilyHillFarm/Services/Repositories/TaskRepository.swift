@@ -78,16 +78,20 @@ class TaskRepository: BaseSyncManager {
     func create(_ task: Task) async throws -> TaskDTO {
         try requireAuth()
 
+        guard let userId = userId else {
+            throw RepositoryError.notAuthenticated
+        }
+
         let farmId = try await getFarmId()
 
-        let dto = TaskDTO(from: task, farmId: farmId)
+        let dto = TaskDTO(from: task, farmId: farmId, userId: userId)
 
         print("📤 TaskRepository.create() - Inserting task:")
         print("  - ID: \(dto.id)")
         print("  - Title: \(dto.title)")
         print("  - Farm ID: \(dto.farmId)")
         print("  - Status: \(dto.status)")
-        print("  - Related Cattle ID: \(dto.relatedCattleId?.uuidString ?? "nil" as String)")
+        print("  - Related Cattle ID: \(dto.cattleId?.uuidString ?? "nil" as String)")
 
         do {
             // Insert without selecting back to avoid RLS issues
@@ -112,9 +116,13 @@ class TaskRepository: BaseSyncManager {
             throw RepositoryError.invalidData
         }
 
+        guard let userId = userId else {
+            throw RepositoryError.notAuthenticated
+        }
+
         let farmId = try await getFarmId()
 
-        let dto = TaskDTO(from: task, farmId: farmId)
+        let dto = TaskDTO(from: task, farmId: farmId, userId: userId)
 
         // Update without selecting back to avoid RLS issues
         try await supabase.client
@@ -168,10 +176,10 @@ class TaskRepository: BaseSyncManager {
                 // Update from DTO
                 taskDTO.update(task)
 
-                // Resolve cattle relationship if related_cattle_id is present
-                if let relatedCattleId = taskDTO.relatedCattleId {
+                // Resolve cattle relationship if cattle_id is present
+                if let cattleId = taskDTO.cattleId {
                     let cattleFetch: NSFetchRequest<Cattle> = Cattle.fetchRequest()
-                    cattleFetch.predicate = NSPredicate(format: "id == %@", relatedCattleId as CVarArg)
+                    cattleFetch.predicate = NSPredicate(format: "id == %@", cattleId as CVarArg)
                     if let cattle = try self.context.fetch(cattleFetch).first {
                         task.cattle = cattle
                     }

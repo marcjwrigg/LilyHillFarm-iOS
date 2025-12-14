@@ -23,8 +23,9 @@ class ChatViewModel: ObservableObject {
 
     private let aiService: AIService
     private let supabaseManager: SupabaseManager
-    @ObservedObject var voiceService: VoiceService = VoiceService()
+    @ObservedObject var voiceService: VoiceService
     private let conversationRepository: MarcConversationRepository
+    private var cancellables = Set<AnyCancellable>()
 
     // Current conversation ID (nil for new conversations)
     var currentConversationId: UUID?
@@ -51,6 +52,12 @@ class ChatViewModel: ObservableObject {
         self.supabaseManager = supabaseManager
         self.conversationRepository = MarcConversationRepository(supabaseManager: supabaseManager)
         self.currentConversationId = conversationId
+        self.voiceService = VoiceService()
+
+        // Forward voiceService changes to ChatViewModel's objectWillChange
+        voiceService.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
 
         // Set up callback for when voice stops automatically (from silence detection)
         voiceService.onAutoStopListening = { [weak self] in
@@ -299,9 +306,9 @@ class ChatViewModel: ObservableObject {
                     // Set callback to show message when audio starts playing
                     voiceService.onAudioPlaybackStarted = { [weak self] in
                         guard let self = self else { return }
-                        _Concurrency.Task { @MainActor in
-                            self.messages.append(assistantMessage)
-                        }
+                        print("📱 [ChatViewModel] onAudioPlaybackStarted callback fired, appending message")
+                        self.messages.append(assistantMessage)
+                        print("📱 [ChatViewModel] Message appended, count: \(self.messages.count)")
                     }
                     voiceService.speak(content, voice: .male)
                 } else {
@@ -345,9 +352,9 @@ class ChatViewModel: ObservableObject {
             if voiceEnabled && !textToSpeak.isEmpty {
                 voiceService.onAudioPlaybackStarted = { [weak self] in
                     guard let self = self else { return }
-                    _Concurrency.Task { @MainActor in
-                        self.messages.append(contentsOf: messagesToAdd)
-                    }
+                    print("📱 [ChatViewModel] onAudioPlaybackStarted callback fired (suggestion), appending messages")
+                    self.messages.append(contentsOf: messagesToAdd)
+                    print("📱 [ChatViewModel] Messages appended, count: \(self.messages.count)")
                 }
                 voiceService.speak(textToSpeak, voice: .male)
             } else {

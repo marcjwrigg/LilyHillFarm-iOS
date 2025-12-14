@@ -31,7 +31,7 @@ class VoiceService: NSObject, ObservableObject {
 
     // Silence detection
     private var silenceTimer: Timer?
-    private let silenceTimeout: TimeInterval = 0.4 // Stop after 0.4 seconds of silence
+    private let silenceTimeout: TimeInterval = 0.8 // Stop after 0.8 seconds of silence
 
     // Callback when listening stops automatically (from silence detection)
     var onAutoStopListening: (() -> Void)?
@@ -117,10 +117,19 @@ class VoiceService: NSObject, ObservableObject {
             throw VoiceError.permissionDenied
         }
 
-        // Configure audio session
+        // Small delay to ensure any previous audio session is fully deactivated
+        try? await _Concurrency.Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+
+        // Configure audio session for recording
         let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        do {
+            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            print("✅ [VoiceService] Audio session activated for recording")
+        } catch {
+            print("❌ [VoiceService] Failed to configure audio session: \(error)")
+            throw VoiceError.audioEngineFailed
+        }
 
         // Create fresh recognition request
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
@@ -149,12 +158,22 @@ class VoiceService: NSObject, ObservableObject {
 
         // Start audio engine and install tap
         let recordingFormat = audioInputNode.outputFormat(forBus: 0)
+
+        // Validate the recording format
+        guard recordingFormat.sampleRate > 0 && recordingFormat.channelCount > 0 else {
+            print("❌ [VoiceService] Invalid audio format: sampleRate=\(recordingFormat.sampleRate), channels=\(recordingFormat.channelCount)")
+            throw VoiceError.audioEngineFailed
+        }
+
+        print("✅ [VoiceService] Recording format: \(recordingFormat.sampleRate)Hz, \(recordingFormat.channelCount) channels")
+
         audioInputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] (buffer: AVAudioPCMBuffer, when: AVAudioTime) in
             self?.recognitionRequest?.append(buffer)
         }
 
         audioEngine.prepare()
         try audioEngine.start()
+        print("✅ [VoiceService] Audio engine started")
 
         // Start recognition
         recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
@@ -248,8 +267,16 @@ class VoiceService: NSObject, ObservableObject {
 
     /// Speak text aloud using OpenAI TTS
     func speak(_ text: String, voice: VoiceType = .natural) {
+        // Save the callback before stopping (stopSpeaking clears it)
+        let savedCallback = onAudioPlaybackStarted
+        print("🔊 [VoiceService] speak() called, callback is \(savedCallback != nil ? "SET" : "nil")")
+
         // Stop any ongoing speech
         stopSpeaking()
+
+        // Restore the callback for the new speech
+        onAudioPlaybackStarted = savedCallback
+        print("🔊 [VoiceService] After stopSpeaking, callback restored: \(onAudioPlaybackStarted != nil ? "SET" : "nil")")
 
         print("🔊 [VoiceService] Generating speech with OpenAI TTS...")
         isGeneratingAudio = true
@@ -270,16 +297,14 @@ class VoiceService: NSObject, ObservableObject {
         _Concurrency.Task {
             do {
                 let audioData = try await fetchTTSAudio(text: text, voice: openAIVoice)
-                await MainActor.run {
-                    self.isGeneratingAudio = false
-                    self.isSpeaking = true
-                }
+                print("✅ [VoiceService] Audio data received, starting playback...")
                 await playAudio(audioData)
             } catch {
                 print("❌ [VoiceService] TTS error: \(error)")
                 await MainActor.run {
                     self.isGeneratingAudio = false
                     self.isSpeaking = false
+                    self.onAudioPlaybackStarted = nil
                     self.errorMessage = "Failed to generate speech: \(error.localizedDescription)"
                 }
             }
@@ -343,27 +368,48 @@ class VoiceService: NSObject, ObservableObject {
             // Create audio player
             let player = try AVAudioPlayer(data: audioData)
             player.delegate = self
+
+            print("🔊 [VoiceService] Starting audio playback...")
+
             await MainActor.run {
                 self.audioPlayer = player
+                self.isSpeaking = true
+                self.isGeneratingAudio = false
+                print("🔊 [VoiceService] Flags updated: isSpeaking=true, isGeneratingAudio=false")
             }
 
-            // Play audio
-            print("🔊 [VoiceService] Playing audio...")
+            // Start playing
+            player.play()
+            print("🔊 [VoiceService] player.play() called")
 
             // Notify that audio playback has started (so UI can show the message)
             await MainActor.run {
-                self.onAudioPlaybackStarted?()
+                print("🔊 [VoiceService] About to call callback, callback is \(self.onAudioPlaybackStarted != nil ? "SET" : "nil")")
+                if let callback = self.onAudioPlaybackStarted {
+                    print("🔊 [VoiceService] Calling onAudioPlaybackStarted callback NOW")
+                    callback()
+                    print("🔊 [VoiceService] Callback completed")
+                } else {
+                    print("❌ [VoiceService] ERROR: Callback is nil, cannot call it!")
+                }
                 self.onAudioPlaybackStarted = nil // Clear callback after use
             }
-
-            player.play()
 
         } catch {
             print("❌ [VoiceService] Playback error: \(error)")
             await MainActor.run {
                 self.isSpeaking = false
                 self.isGeneratingAudio = false
+                self.onAudioPlaybackStarted = nil
                 self.errorMessage = "Failed to play audio: \(error.localizedDescription)"
+
+                // Deactivate audio session on error
+                do {
+                    try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                    print("✅ [VoiceService] Audio session deactivated after playback error")
+                } catch {
+                    print("⚠️ [VoiceService] Failed to deactivate audio session: \(error)")
+                }
             }
         }
     }
@@ -378,6 +424,15 @@ class VoiceService: NSObject, ObservableObject {
         isSpeaking = false
         isGeneratingAudio = false
         onAudioPlaybackStarted = nil // Clear callback
+
+        // Deactivate audio session to allow switching back to recording
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            print("✅ [VoiceService] Audio session deactivated")
+        } catch {
+            print("⚠️ [VoiceService] Failed to deactivate audio session: \(error)")
+        }
+
         print("✅ [VoiceService] Speech stopped")
     }
 }
@@ -386,12 +441,22 @@ class VoiceService: NSObject, ObservableObject {
 
 extension VoiceService: AVAudioPlayerDelegate {
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        print("✅ [VoiceService] Audio playback finished (success: \(flag))")
+        print("✅ [VoiceService] audioPlayerDidFinishPlaying called (success: \(flag))")
         _Concurrency.Task { @MainActor in
+            print("🔊 [VoiceService] Clearing flags after playback finished")
             self.isSpeaking = false
             self.isGeneratingAudio = false
             self.audioPlayer = nil
-            print("✅ [VoiceService] isSpeaking and isGeneratingAudio set to false")
+
+            // Deactivate audio session to allow switching back to recording
+            do {
+                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                print("✅ [VoiceService] Audio session deactivated after playback")
+            } catch {
+                print("⚠️ [VoiceService] Failed to deactivate audio session: \(error)")
+            }
+
+            print("✅ [VoiceService] Flags cleared: isSpeaking=false, isGeneratingAudio=false")
         }
     }
 
@@ -402,6 +467,14 @@ extension VoiceService: AVAudioPlayerDelegate {
             self.isGeneratingAudio = false
             self.audioPlayer = nil
             self.errorMessage = "Audio playback failed"
+
+            // Deactivate audio session
+            do {
+                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                print("✅ [VoiceService] Audio session deactivated after error")
+            } catch {
+                print("⚠️ [VoiceService] Failed to deactivate audio session: \(error)")
+            }
         }
     }
 }
